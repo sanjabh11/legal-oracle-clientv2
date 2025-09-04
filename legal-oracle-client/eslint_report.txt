@@ -1,0 +1,6 @@
+﻿
+C:\Users\Sanjay\legal-oracle-clientv2\legal-oracle-client\src\components\NashEquilibrium.tsx
+  75:6  warning  React Hook useEffect has a missing dependency: 'predefinedScenarios'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+Ô£û 1 problem (0 errors, 1 warning)
+

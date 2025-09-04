@@ -1,0 +1,14 @@
+{
+  "pbis": [
+    {
+      "pbi_id": "LO-PBI-001",
+      "title": "PRD Consolidation: FastAPI canonical + endpoint contracts",
+      "status": "Agreed",
+      "tasks_index": "docs/delivery/LO-PBI-001/tasks_index.json",
+      "files": [
+        "legal-oracle-client/prd.md"
+      ]
+    }
+  ],
+  "updated_at": "2025-08-26T14:09:40+05:30"
+}

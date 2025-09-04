@@ -1,0 +1,29 @@
+# Global ignores
+# Node
+node_modules/
+.pnp*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.envrc
+
+# Build outputs
+/dist/
+/build/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env files (never commit secrets)
+.env
+.env.*
+!.env.example
+.env.local

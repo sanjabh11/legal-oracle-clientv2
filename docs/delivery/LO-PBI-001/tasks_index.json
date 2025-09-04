@@ -1,0 +1,557 @@
+{
+  "pbi_id": "LO-PBI-001",
+  "title": "PRD Consolidation: FastAPI canonical + endpoint contracts",
+  "status": "InProgress",
+  "tasks": [
+    {
+      "task_id": "LO-PBI-001-T1",
+      "title": "Align architecture; label Node as alternative",
+      "type": "doc",
+      "status": "InProgress",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T2",
+      "title": "Complete useCaselaw snippet",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T3",
+      "title": "API Endpoint Specifications",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T4",
+      "title": "Acceptance Criteria",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T5",
+      "title": "Test Plan with curl examples",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T6",
+      "title": "Security/Compliance",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T7",
+      "title": "Environment Variables",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T8",
+      "title": "Production Validation updates",
+      "type": "doc",
+      "status": "Agreed",
+      "files": ["legal-oracle-client/prd.md"],
+      "test_plan": {},
+      "status_history": []
+    }
+    ,
+    {
+      "task_id": "LO-PBI-001-T9",
+      "title": "FastAPI stub for PRD endpoints + curl test harness",
+      "type": "code",
+      "status": "Done",
+      "files": [
+        "stub_api/main.py",
+        "stub_api/constants.py",
+        "stub_api/requirements.txt",
+        "docs/delivery/LO-PBI-001/test_evidence/"
+      ],
+      "test_plan": {
+        "env": {
+          "API": "http://127.0.0.1:8000",
+          "TOKEN": "test-admin"
+        },
+        "setup": [
+          "python -m pip install -r stub_api/requirements.txt",
+          "python -m uvicorn stub_api.main:app --host 127.0.0.1 --port 8000"
+        ],
+        "tests": [
+          "curl $env:API/api/v1/admin/health",
+          "curl -Headers @{ Authorization = 'Bearer '+$env:TOKEN } $env:API/api/v1/admin/metrics",
+          "curl -Headers @{ Authorization = 'Bearer '+$env:TOKEN } $env:API/api/v1/datasets"
+        ],
+        "expected": {
+          "admin_health.status": "ok",
+          "admin_metrics.requests_per_min": ">=0",
+          "datasets.datasets": ">=1 items"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T19:05:56+05:30",
+          "action": "set_status",
+          "from": "InProgress",
+          "to": "Done",
+          "evidence_path": "docs/delivery/LO-PBI-001/test_evidence/",
+          "artifacts": [
+            "admin_health.json",
+            "admin_metrics.json",
+            "datasets_list.json",
+            "outcome_predict.json",
+            "export.csv"
+          ],
+          "note": "MVP smoke run completed with OK; artifacts captured."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T10",
+      "title": "UI revamp: Hero + glassmorphism + serif + responsive + motion",
+      "type": "ui",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/index.html",
+        "legal-oracle-client/src/App.tsx",
+        "legal-oracle-client/src/index.css",
+        "legal-oracle-client/src/hooks/useRevealOnScroll.ts"
+      ],
+      "test_plan": {
+        "visual": [
+          "Load / route on mobile viewport (375px) — hero visible, text readable, glass overlay, serif headings",
+          "Hover cards animate smoothly; sections fade-in when scrolled"
+        ]
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T19:18:02+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "Initial UI implementation committed."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T11",
+      "title": "Security hardening: .env ignore, CSP/CORS, health protection, audits",
+      "type": "security",
+      "status": "InProgress",
+      "files": [
+        ".gitignore",
+        "legal-oracle-client/.gitignore",
+        "legal-oracle-client/.env.example",
+        "legal-oracle-client/public/_headers",
+        "legal-oracle-client/public/_redirects",
+        "stub_api/main.py"
+      ],
+      "test_plan": {
+        "checks": [
+          ".env files ignored by git",
+          "CSP/CORS headers present on build output via _headers",
+          "With PROTECT_ADMIN_HEALTH=1, /api/v1/admin/health requires admin token"
+        ]
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T19:18:02+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "CORS, _headers, and .env hygiene committed."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T12",
+      "title": "Fix build blocker in App.tsx (</Routes>) and verify build",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/src/App.tsx"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm install",
+          "pnpm run lint",
+          "pnpm run build"
+        ],
+        "expected": {
+          "build": "succeeds without JSX errors"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T19:18:02+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "Repaired closing tag and enhanced UI. Build pending."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T13",
+      "title": "TypeScript fixes in DocumentAnalysis and JudgeAnalysis to unblock build",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/src/components/DocumentAnalysis.tsx",
+        "legal-oracle-client/src/components/JudgeAnalysis.tsx"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm exec tsc -p tsconfig.app.json --noEmit",
+          "pnpm run build"
+        ],
+        "expected": {
+          "tsc": "0 errors",
+          "build": "Vite build completes"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T19:45:00+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "Authorize TS fixes in components to unblock build."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T14",
+      "title": "Fix Tailwind config for ESM to resolve Vite/PostCSS build error",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/tailwind.config.js"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm exec vite build"
+        ],
+        "expected": {
+          "build": "Vite build completes without PostCSS/Tailwind errors"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-26T21:54:00+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "Authorize Tailwind ESM config fix under type:module."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T15",
+      "title": "Make package.json scripts cross-platform (Windows-safe)",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/package.json"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm run build",
+          "pnpm run preview"
+        ],
+        "expected": {
+          "build": "Scripts run without Unix-only utilities on Windows",
+          "preview": "Preview starts successfully"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T12:34:00+05:30",
+          "action": "set_status",
+          "from": "Proposed",
+          "to": "InProgress",
+          "note": "Authorize Windows-safe script changes using rimraf and cross-env."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T16",
+      "title": "Fix PostCSS config (explicit imports) for Node 22 ESM resolution",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/postcss.config.js"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm exec vite build"
+        ],
+        "expected": {
+          "build": "Vite build completes; dist/ generated"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T08:42:00+05:30",
+          "action": "set_status",
+          "from": "Agreed",
+          "to": "InProgress",
+          "note": "Authorize PostCSS plugin explicit import to avoid Node 22 resolver issue."
+        }
+      ]
+    }
+    ,
+    {
+      "task_id": "LO-PBI-001-T19",
+      "title": "Demo data fallbacks when Supabase tables are unavailable (prevent blank UI)",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/src/lib/supabase.ts",
+        "legal-oracle-client/src/App.tsx",
+        "legal-oracle-client/src/components/JudgeAnalysis.tsx"
+      ],
+      "test_plan": {
+        "steps": [
+          "pnpm run build",
+          "pnpm run preview",
+          "Open / and verify stats show non-zero demo values and Recent Cases section populates",
+          "Navigate to /judge-analysis and verify list populated with demo judges and analysis works"
+        ],
+        "expected": {
+          "dashboard": "Renders with demo counts and recent cases when Supabase errors occur",
+          "judge_analysis": "Renders list and allows analysis without backend"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T12:55:10+05:30",
+          "action": "set_status",
+          "from": "Proposed",
+          "to": "InProgress",
+          "note": "Authorize adding mock fallbacks to keep UI functional when Supabase tables are missing."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T20",
+      "title": "Provision Supabase tables and remove client-side demo fallbacks (use real data only)",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "docs/delivery/LO-PBI-001/sql/001_create_core_tables.sql",
+        "legal-oracle-client/src/lib/supabase.ts",
+        "legal-oracle-client/src/App.tsx"
+      ],
+      "test_plan": {
+        "steps": [
+          "Apply SQL in Supabase SQL Editor: docs/delivery/LO-PBI-001/sql/001_create_core_tables.sql",
+          "Insert a few seed rows for each table (optional)",
+          "pnpm run build",
+          "pnpm run preview",
+          "Open / and /judge-analysis; verify no demo data or banner is shown",
+          "Check browser network: 200 OK for /rest/v1/legal_cases, judge_patterns, strategic_patterns, legal_oracle_caselaw_cache"
+        ],
+        "expected": {
+          "network": "REST calls return 200 with rows (or 200 with empty array)",
+          "ui": "No demo banner; UI lists reflect actual DB contents"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T18:12:00+05:30",
+          "action": "set_status",
+          "from": "Proposed",
+          "to": "InProgress",
+          "note": "Authorize DDL creation and code changes to disable demo fallbacks per user direction."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T17",
+      "title": "Switch PostCSS config to CommonJS (postcss.config.cjs) and remove ESM file to bypass Node resolver bug",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/postcss.config.cjs",
+        "legal-oracle-client/postcss.config.js"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm exec vite build"
+        ],
+        "expected": {
+          "build": "Vite build completes; dist/ generated"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T09:22:00+05:30",
+          "action": "set_status",
+          "from": "Proposed",
+          "to": "InProgress",
+          "note": "Authorize migration to CJS PostCSS config and removal of ESM file (Option A)."
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T18",
+      "title": "Downgrade Vite to 5.4.x to avoid Node ESM resolver issue in CSS pipeline",
+      "type": "code",
+      "status": "InProgress",
+      "files": [
+        "legal-oracle-client/package.json"
+      ],
+      "test_plan": {
+        "commands": [
+          "pnpm install",
+          "pnpm exec vite build"
+        ],
+        "expected": {
+          "build": "Vite build completes; dist/ generated"
+        }
+      },
+      "status_history": [
+        {
+          "timestamp": "2025-08-27T12:30:00+05:30"
+        }
+      ]
+    },
+    {
+      "task_id": "LO-PBI-001-T21",
+      "title": "Implement real FastAPI backend with Supabase and LLM integration (replace stubs)",
+      "type": "code",
+      "status": "Agreed",
+      "files": [
+        "stub_api/main.py",
+        "stub_api/constants.py",
+        "stub_api/requirements.txt"
+      ],
+      "test_plan": {
+        "env": {
+          "API": "http://127.0.0.1:8000",
+          "TOKEN": "test-admin"
+        },
+        "setup": [
+          "python -m pip install -r stub_api/requirements.txt",
+          "python -m uvicorn stub_api.main:app --host 127.0.0.1 --port 8000"
+        ],
+        "tests": [
+          "curl -X GET $API/api/v1/admin/health",
+          "curl -H 'Authorization: Bearer $TOKEN' -X POST $API/api/v1/outcome/predict -H 'Content-Type: application/json' -d '{\\\"case_type\\\": \\\"contract_dispute\\\", \\\"jurisdiction\\\": \\\"California\\\", \\\"key_facts\\\": [\\\"breach of contract\\\"], \\\"judge_id\\\": \\\"judge_123\\\"}'",
+          "Verify response uses real Supabase data and LLM processing"
+        ],
+        "expected": {
+          "outcome_predict": "Returns real probabilities from LLM, not static 0.5",
+          "supabase_calls": "Backend queries legal_cases, judge_patterns tables",
+          "llm_integration": "Processes via HuggingFace/Gemini API"
+        }
+      },
+      "status_history": []
+    },
+    {
+      "title": "Update components to use backend endpoints instead of direct Supabase queries",
+      "type": "code",
+      "status": "Agreed",
+      "files": [
+        "legal-oracle-client/src/components/JudgeAnalysis.tsx",
+        "legal-oracle-client/src/components/CasePrediction.tsx",
+        "legal-oracle-client/src/lib/supabase.ts"
+      ],
+      "test_plan": {
+        "steps": [
+          "Update JudgeAnalysis to call /api/v1/caselaw/judge-analysis",
+          "Update CasePrediction to call /api/v1/outcome/predict",
+          "Ensure NashEquilibrium uses /api/v1/simulation/run for backend integration",
+          "pnpm run build",
+          "pnpm run preview",
+          "Test component functionality with backend running"
+        ],
+        "expected": {
+          "network_calls": "Components make API calls to backend, not direct Supabase",
+          "functionality": "Analysis and predictions work via backend endpoints"
+        }
+      },
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T23",
+      "title": "Add comprehensive tests for all user stories and endpoints",
+      "type": "test",
+      "status": "Agreed",
+      "files": [
+        "legal-oracle-client/src/__tests__/",
+        "stub_api/tests/",
+        "docs/delivery/LO-PBI-001/test_evidence/"
+      ],
+      "test_plan": {
+        "frontend": [
+          "Add Jest tests for JudgeAnalysis, CasePrediction, NashEquilibrium components",
+          "Test API calls and UI rendering",
+          "pnpm test"
+        ],
+        "backend": [
+          "Add pytest tests for FastAPI endpoints",
+          "Test authentication, data retrieval, LLM integration",
+          "python -m pytest stub_api/tests/"
+        ],
+        "integration": [
+          "Test end-to-end user stories with curl",
+          "Verify all 10 user stories work with real data"
+        ],
+        "expected": {
+          "test_coverage": "80%+ for critical paths",
+          "user_stories": "All 10 stories testable and passing"
+        }
+      },
+      "status_history": []
+    },
+    {
+      "task_id": "LO-PBI-001-T24",
+      "title": "Integrate LLM providers (HuggingFace/Gemini) in backend",
+      "type": "code",
+      "status": "Agreed",
+      "files": [
+        "stub_api/main.py",
+        "stub_api/requirements.txt",
+        ".env.example"
+      ],
+      "test_plan": {
+        "setup": [
+          "Add HF_API_TOKEN and GEMINI_API_KEY to .env",
+          "Install huggingface_hub and google-generativeai in requirements.txt"
+        ],
+        "tests": [
+          "Test /api/v1/outcome/predict with real LLM call",
+          "Verify response includes AI-generated analysis",
+          "Test error handling for missing keys"
+        ],
+        "expected": {
+          "llm_calls": "Backend makes server-side LLM calls",
+          "responses": "Include real AI analysis, not mock text"
+        }
+      },
+      "status_history": []
+    }
+  ],
+  "updated_at": "2025-09-04T10:10:43+05:30"
+}

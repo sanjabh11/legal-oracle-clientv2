@@ -1,0 +1,3 @@
+﻿src/components/DocumentAnalysis.tsx(164,21): error TS2345: Argument of type 'string | ArrayBuffer' is not assignable to parameter of type 'SetStateAction<string>'.
+  Type 'ArrayBuffer' is not assignable to type 'SetStateAction<string>'.
+src/components/JudgeAnalysis.tsx(275,74): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.

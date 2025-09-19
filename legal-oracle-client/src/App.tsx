@@ -4,7 +4,18 @@ import { Scale, Brain, Users, Calculator, FileText, TrendingUp, Search, Gavel, S
 import { LegalDatabaseService, HuggingFaceAPI, GameTheoryEngine, getAuthHeaders } from './lib/supabase'
 
 // Import components
-import { CasePrediction, JudgeAnalysis, NashEquilibrium } from './components'
+import { 
+  CasePrediction, 
+  JudgeAnalysis, 
+  NashEquilibrium,
+  TrendForecasting,
+  JurisdictionOptimizer,
+  PrecedentSearch,
+  SettlementAnalysis,
+  MultiPlayerScenarios,
+  StrategicIntelligence,
+  CoalitionAnalysis
+} from './components'
 import DocumentAnalysis from './components/DocumentAnalysis'
 
 import './App.css'
@@ -25,6 +36,14 @@ function App() {
           <Route path="/nash-equilibrium" element={<NashEquilibrium />} />
           <Route path="/document-analysis" element={<DocumentAnalysis />} />
           <Route path="/game-theory" element={<NashEquilibrium />} />
+          <Route path="/trend-forecasting" element={<TrendForecasting />} />
+          <Route path="/jurisdiction-optimizer" element={<JurisdictionOptimizer />} />
+          <Route path="/legal-trends" element={<TrendForecasting />} />
+          <Route path="/precedent-search" element={<PrecedentSearch />} />
+          <Route path="/settlement-analysis" element={<SettlementAnalysis />} />
+          <Route path="/multi-player" element={<MultiPlayerScenarios />} />
+          <Route path="/strategic-intelligence" element={<StrategicIntelligence />} />
+          <Route path="/coalition-analysis" element={<CoalitionAnalysis />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
@@ -252,35 +271,32 @@ function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Hero Section (full-width background with glassmorphism) */}
-      <div
-        className="relative mb-12 rounded-2xl overflow-hidden min-h-[60vh] md:min-h-[70vh] bg-slate-800"
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 via-slate-900/40 to-slate-900/70" />
-        <div className="relative z-10 h-full w-full flex items-center justify-center px-4 py-12">
-          <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl max-w-3xl w-full mx-auto p-6 sm:p-10 shadow-2xl">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white font-serif text-center mb-4">
+      <div className="hero-section">
+        <div className="hero-content">
+          <div className="hero-glass-panel">
+            <h1 className="hero-title">
               AI-Powered Legal Intelligence Platform
             </h1>
-            <p className="text-base sm:text-lg md:text-xl text-blue-100 text-center mb-8">
+            <p className="hero-subtitle">
               Harness the power of artificial intelligence, game theory, and real legal data to make informed decisions
               in complex legal scenarios
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
-              <div className="bg-blue-600/20 backdrop-blur-sm rounded-lg p-3 md:p-4 border border-blue-500/20 text-center" style={{ transitionDelay: '60ms' }}>
-                <div className="text-2xl md:text-3xl font-bold text-blue-300">{stats.totalCases}</div>
-                <div className="text-blue-100 text-xs md:text-sm">Legal Cases</div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-number">{stats.totalCases}</div>
+                <div className="stat-label">Legal Cases</div>
               </div>
-              <div className="bg-purple-600/20 backdrop-blur-sm rounded-lg p-3 md:p-4 border border-purple-500/20 text-center" style={{ transitionDelay: '120ms' }}>
-                <div className="text-2xl md:text-3xl font-bold text-purple-300">{stats.judgePatterns}</div>
-                <div className="text-purple-100 text-xs md:text-sm">Judge Profiles</div>
+              <div className="stat-card">
+                <div className="stat-number">{stats.judgePatterns}</div>
+                <div className="stat-label">Judge Profiles</div>
               </div>
-              <div className="bg-green-600/20 backdrop-blur-sm rounded-lg p-3 md:p-4 border border-green-500/20 text-center" style={{ transitionDelay: '180ms' }}>
-                <div className="text-2xl md:text-3xl font-bold text-green-300">{stats.strategicPatterns}</div>
-                <div className="text-green-100 text-xs md:text-sm">Strategy Patterns</div>
+              <div className="stat-card">
+                <div className="stat-number">{stats.strategicPatterns}</div>
+                <div className="stat-label">Strategy Patterns</div>
               </div>
-              <div className="bg-orange-600/20 backdrop-blur-sm rounded-lg p-3 md:p-4 border border-orange-500/20 text-center" style={{ transitionDelay: '240ms' }}>
-                <div className="text-2xl md:text-3xl font-bold text-orange-300">{stats.predictionAccuracy}%</div>
-                <div className="text-orange-100 text-xs md:text-sm">AI Accuracy</div>
+              <div className="stat-card">
+                <div className="stat-number">{stats.predictionAccuracy}%</div>
+                <div className="stat-label">AI Accuracy</div>
               </div>
             </div>
           </div>
@@ -288,7 +304,7 @@ function Dashboard() {
       </div>
       
       {/* Features Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+      <div className="features-grid">
         {features.map((feature, index) => {
           const Icon = feature.icon
           return (
@@ -296,19 +312,17 @@ function Dashboard() {
               key={feature.path}
               to={feature.path}
               style={{ transitionDelay: `${index * 60}ms` }}
-              className="reveal-start group bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:bg-slate-800/70 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+              className="feature-card reveal-start group"
             >
-              <div className="flex items-start space-x-4">
-                <div className={`${feature.color} p-3 rounded-lg group-hover:scale-110 transition-transform`}>
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors font-serif">
-                    {feature.name}
-                  </h3>
-                  <p className="text-slate-300 text-sm mb-3">{feature.description}</p>
-                  <div className="text-blue-400 text-xs font-medium">{feature.stat}</div>
-                </div>
+              <div className="feature-icon" style={{ backgroundColor: feature.color }}>
+                <Icon className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="feature-title group-hover:text-blue-400 transition-colors">
+                  {feature.name}
+                </h3>
+                <p className="feature-description">{feature.description}</p>
+                <div className="feature-stat">{feature.stat}</div>
               </div>
             </Link>
           )
@@ -316,11 +330,11 @@ function Dashboard() {
       </div>
       
       {/* Recent Cases Section */}
-      <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-6 border border-slate-700" data-reveal>
-        <h2 className="text-2xl font-bold text-white mb-6">Recent Legal Cases</h2>
+      <div className="glass-card reveal-start" data-reveal>
+        <h2 className="text-2xl font-bold text-white mb-6 font-serif">Recent Legal Cases</h2>
         <div className="space-y-4">
           {recentCases.map((case_, index) => (
-            <div key={case_.id || index} className="reveal-start bg-slate-700/50 rounded-lg p-4 border border-slate-600" data-reveal style={{ transitionDelay: `${index * 60}ms` }}>
+            <div key={case_.id || index} className="glass-card reveal-start" data-reveal style={{ transitionDelay: `${index * 60}ms` }}>
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-semibold text-white">{case_.case_title}</h3>
                 <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded">

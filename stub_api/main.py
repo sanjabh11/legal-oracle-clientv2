@@ -754,51 +754,179 @@ async def forecast_trends(industry: str, jurisdictions: str, time_horizon: str, 
 @app.get("/api/v1/jurisdiction/optimize")
 async def optimize_jurisdiction(case_type: str, key_facts: str, preferred_outcome: str, Authorization: Optional[str] = Header(None)):
     """
-    Recommend optimal jurisdictions for filing a case.
+    Recommend optimal jurisdictions for filing a case - REAL DATA VERSION
     User Story 5: Jurisdiction Optimization
+    
+    Analyzes historical case data from legal_cases table to provide data-driven recommendations
     """
     require_auth(Authorization)
     
     key_facts_list = [f.strip() for f in key_facts.split(',')]
     
-    # Analyze jurisdictions based on case type and facts
-    recommended_jurisdictions = [
-        {
-            "jurisdiction": "Delaware",
-            "score": 0.92,
-            "reasons": [
-                "Favorable corporate law precedents",
-                "Experienced judiciary",
-                "Fast resolution times"
-            ],
-            "estimated_timeline": "8-12 months",
-            "success_probability": 0.78
-        },
-        {
-            "jurisdiction": "New York",
-            "score": 0.85,
-            "reasons": [
-                "Strong commercial courts",
-                "Comprehensive case law",
-                "International recognition"
-            ],
-            "estimated_timeline": "12-18 months",
-            "success_probability": 0.72
+    # Query legal_cases table for jurisdiction performance by case type
+    try:
+        # Get all cases of this type, grouped by jurisdiction
+        cases_query = supabase.table("legal_cases").select("jurisdiction, outcome_label, damages_amount, decision_date, created_at").eq("case_type", case_type).execute()
+        
+        if not cases_query.data:
+            # Fallback: get all cases if no specific case_type matches
+            cases_query = supabase.table("legal_cases").select("jurisdiction, outcome_label, damages_amount, decision_date, created_at").execute()
+        
+        cases = cases_query.data
+        
+        # Analyze jurisdiction performance
+        jurisdiction_stats = {}
+        for case in cases:
+            jur = case.get("jurisdiction") or "Unknown"
+            if jur not in jurisdiction_stats:
+                jurisdiction_stats[jur] = {
+                    "total_cases": 0,
+                    "plaintiff_wins": 0,
+                    "defendant_wins": 0,
+                    "settlements": 0,
+                    "total_damages": 0,
+                    "damages_count": 0,
+                    "resolution_times": []
+                }
+            
+            stats = jurisdiction_stats[jur]
+            stats["total_cases"] += 1
+            
+            outcome = (case.get("outcome_label") or "").lower()
+            if "plaintiff" in outcome or "win" in outcome:
+                stats["plaintiff_wins"] += 1
+            elif "defendant" in outcome or "loss" in outcome:
+                stats["defendant_wins"] += 1
+            elif "settle" in outcome:
+                stats["settlements"] += 1
+            
+            if case.get("damages_amount"):
+                stats["total_damages"] += float(case.get("damages_amount"))
+                stats["damages_count"] += 1
+            
+            # Calculate resolution time if both dates available
+            if case.get("decision_date") and case.get("created_at"):
+                try:
+                    decision = datetime.fromisoformat(str(case["decision_date"]))
+                    created = datetime.fromisoformat(str(case["created_at"]).replace('Z', '+00:00'))
+                    days_diff = (decision - created).days
+                    if days_diff > 0:
+                        stats["resolution_times"].append(days_diff)
+                except Exception:
+                    pass
+        
+        # Calculate scores and rank jurisdictions
+        recommended_jurisdictions = []
+        for jur, stats in jurisdiction_stats.items():
+            if stats["total_cases"] < 2:  # Need at least 2 cases for meaningful stats
+                continue
+            
+            # Calculate success probability based on preferred outcome
+            if preferred_outcome.lower() in ["win", "plaintiff"]:
+                success_prob = stats["plaintiff_wins"] / stats["total_cases"]
+            elif preferred_outcome.lower() in ["settle", "settlement"]:
+                success_prob = stats["settlements"] / stats["total_cases"]
+            else:
+                # General success rate (plaintiff wins + settlements)
+                success_prob = (stats["plaintiff_wins"] + stats["settlements"]) / stats["total_cases"]
+            
+            # Calculate average damages
+            avg_damages = stats["total_damages"] / stats["damages_count"] if stats["damages_count"] > 0 else 0
+            
+            # Calculate average resolution time
+            avg_resolution_days = int(np.mean(stats["resolution_times"])) if stats["resolution_times"] else 365
+            avg_resolution_months = avg_resolution_days / 30
+            
+            # Calculate composite score (weighted)
+            score = (
+                success_prob * 0.5 +  # 50% weight on success probability
+                min(1.0, stats["total_cases"] / 20) * 0.2 +  # 20% weight on case volume (experience)
+                (1.0 - min(1.0, avg_resolution_months / 24)) * 0.3  # 30% weight on speed (faster is better)
+            )
+            
+            # Generate reasons based on data
+            reasons = []
+            if success_prob > 0.7:
+                reasons.append(f"High success rate: {success_prob*100:.1f}% for {preferred_outcome} outcomes")
+            if stats["total_cases"] >= 10:
+                reasons.append(f"Substantial precedent: {stats['total_cases']} similar cases")
+            if avg_resolution_months < 12:
+                reasons.append(f"Fast resolution: avg {avg_resolution_months:.1f} months")
+            if avg_damages > 100000:
+                reasons.append(f"Favorable damages: avg ${avg_damages:,.0f}")
+            if not reasons:
+                reasons.append(f"Based on {stats['total_cases']} historical cases")
+            
+            # Estimate timeline
+            if avg_resolution_months < 6:
+                timeline = "3-6 months"
+            elif avg_resolution_months < 12:
+                timeline = "6-12 months"
+            elif avg_resolution_months < 18:
+                timeline = "12-18 months"
+            else:
+                timeline = "18-24 months"
+            
+            recommended_jurisdictions.append({
+                "jurisdiction": jur,
+                "score": round(score, 2),
+                "reasons": reasons,
+                "estimated_timeline": timeline,
+                "success_probability": round(success_prob, 2),
+                "historical_cases": stats["total_cases"],
+                "avg_damages": round(avg_damages, 2) if avg_damages > 0 else None,
+                "avg_resolution_months": round(avg_resolution_months, 1)
+            })
+        
+        # Sort by score descending
+        recommended_jurisdictions.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Take top 5
+        recommended_jurisdictions = recommended_jurisdictions[:5]
+        
+        if not recommended_jurisdictions:
+            # Return at least one recommendation based on fallback data
+            recommended_jurisdictions = [{
+                "jurisdiction": "Federal",
+                "score": 0.5,
+                "reasons": ["Insufficient historical data - general recommendation"],
+                "estimated_timeline": "12-18 months",
+                "success_probability": 0.5,
+                "historical_cases": 0
+            }]
+        
+        return {
+            "recommended_jurisdictions": recommended_jurisdictions,
+            "case_type": case_type,
+            "key_facts": key_facts_list,
+            "preferred_outcome": preferred_outcome,
+            "analysis_method": "real_data",
+            "total_jurisdictions_analyzed": len(jurisdiction_stats)
         }
-    ]
-    
-    return {
-        "recommended_jurisdictions": recommended_jurisdictions,
-        "case_type": case_type,
-        "key_facts": key_facts_list,
-        "preferred_outcome": preferred_outcome
-    }
+        
+    except Exception as e:
+        # Error handling - return empty but valid response
+        return {
+            "recommended_jurisdictions": [{
+                "jurisdiction": "Federal",
+                "score": 0.5,
+                "reasons": [f"Analysis error: {str(e)}"],
+                "estimated_timeline": "12-18 months",
+                "success_probability": 0.5
+            }],
+            "case_type": case_type,
+            "key_facts": key_facts_list,
+            "preferred_outcome": preferred_outcome,
+            "error": str(e)
+        }
 
 @app.post("/api/v1/precedent/simulate")
 async def simulate_precedent(payload: dict, Authorization: Optional[str] = Header(None)):
     """
-    Simulate the impact of a judicial decision on future cases.
+    Simulate the impact of a judicial decision on future cases - REAL CITATION GRAPH ANALYSIS
     User Story 6: Precedent Impact Simulation
+    
+    Uses precedent_relationships table to build citation graph and analyze real impact
     """
     require_auth(Authorization)
     
@@ -806,82 +934,386 @@ async def simulate_precedent(payload: dict, Authorization: Optional[str] = Heade
     decision = payload.get("decision") 
     jurisdiction = payload.get("jurisdiction")
     
-    # Simulate impact analysis
-    impact_analysis = {
-        "affected_cases": 156,
-        "precedent_strength": "strong",
-        "citation_likelihood": 0.68,
-        "future_impact": {
-            "similar_cases": {
-                "count": 45,
-                "outcome_shift": "+12% plaintiff favorable"
+    try:
+        # Get the case details
+        case_resp = supabase.table("legal_cases").select("*").eq("case_id", case_id).maybe_single().execute()
+        if not case_resp.data:
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        
+        case_data = case_resp.data
+        case_type = case_data.get("case_type")
+        
+        # Query precedent_relationships to build citation graph
+        # Get all cases that cite this case (downstream impact)
+        citing_cases = supabase.table("precedent_relationships").select("from_case, relation_type").eq("to_case", case_id).execute()
+        
+        # Get all cases cited by this case (upstream precedents)
+        cited_by_case = supabase.table("precedent_relationships").select("to_case, relation_type").eq("from_case", case_id).execute()
+        
+        # Calculate impact metrics
+        downstream_count = len(citing_cases.data) if citing_cases.data else 0
+        upstream_count = len(cited_by_case.data) if cited_by_case.data else 0
+        
+        # Find similar cases in same jurisdiction and case type
+        similar_cases_resp = supabase.table("legal_cases").select("case_id, case_name, outcome_label").eq("case_type", case_type).eq("jurisdiction", jurisdiction).limit(100).execute()
+        similar_cases = similar_cases_resp.data if similar_cases_resp.data else []
+        similar_count = len([c for c in similar_cases if c.get("case_id") != case_id])
+        
+        # Calculate precedent strength based on citation network
+        # Higher citation count = stronger precedent
+        if downstream_count >= 20:
+            precedent_strength = "very_strong"
+            strength_score = 0.9
+        elif downstream_count >= 10:
+            precedent_strength = "strong"
+            strength_score = 0.75
+        elif downstream_count >= 5:
+            precedent_strength = "moderate"
+            strength_score = 0.6
+        elif downstream_count >= 1:
+            precedent_strength = "weak"
+            strength_score = 0.4
+        else:
+            precedent_strength = "minimal"
+            strength_score = 0.2
+        
+        # Calculate citation likelihood based on case age and current citation rate
+        case_age_days = 365  # Default
+        if case_data.get("decision_date"):
+            try:
+                decision_date = datetime.fromisoformat(str(case_data["decision_date"]))
+                case_age_days = (datetime.now() - decision_date).days
+            except Exception:
+                pass
+        
+        # Citation velocity (citations per year)
+        if case_age_days > 0:
+            citation_velocity = (downstream_count / (case_age_days / 365)) if case_age_days > 30 else 0
+        else:
+            citation_velocity = 0
+        
+        citation_likelihood = min(0.95, 0.3 + citation_velocity * 0.1 + strength_score * 0.4)
+        
+        # Analyze outcome patterns in similar cases
+        outcome_analysis = {}
+        for case in similar_cases:
+            outcome = case.get("outcome_label") or "unknown"
+            outcome_analysis[outcome] = outcome_analysis.get(outcome, 0) + 1
+        
+        # Determine affected cases and outcome shifts
+        affected_cases = downstream_count + similar_count
+        
+        # Identify related legal areas from case metadata and similar cases
+        related_areas = []
+        if case_data.get("metadata"):
+            metadata = case_data["metadata"]
+            if isinstance(metadata, dict) and metadata.get("legal_issues"):
+                related_areas.extend(metadata["legal_issues"])
+        
+        # Add case type variations
+        if case_type:
+            related_areas.append(case_type.replace("_", " ").title())
+        
+        if not related_areas:
+            related_areas = ["General legal principles", "Similar fact patterns", "Jurisdictional precedents"]
+        
+        # Calculate timeline effects based on court hierarchy
+        court_level = (case_data.get("court") or "").lower()
+        if "supreme" in court_level:
+            timeline_effects = {
+                "immediate": "Binding precedent across jurisdiction",
+                "short_term": "Nationwide influence expected",
+                "long_term": "Landmark precedent status likely"
+            }
+        elif "circuit" in court_level or "appeals" in court_level:
+            timeline_effects = {
+                "immediate": "Circuit-wide binding precedent",
+                "short_term": "Influence on district courts",
+                "long_term": "Potential circuit split resolution"
+            }
+        elif "district" in court_level:
+            timeline_effects = {
+                "immediate": "Persuasive authority in district",
+                "short_term": "Local jurisdiction influence",
+                "long_term": "May inform appellate decisions"
+            }
+        else:
+            timeline_effects = {
+                "immediate": "Limited immediate impact",
+                "short_term": "Gradual adoption possible",
+                "long_term": "Dependent on subsequent citations"
+            }
+        
+        impact_analysis = {
+            "affected_cases": affected_cases,
+            "precedent_strength": precedent_strength,
+            "citation_likelihood": round(citation_likelihood, 2),
+            "citation_metrics": {
+                "downstream_citations": downstream_count,
+                "upstream_citations": upstream_count,
+                "citation_velocity_per_year": round(citation_velocity, 2),
+                "case_age_years": round(case_age_days / 365, 1)
             },
-            "related_areas": [
-                "Contract interpretation",
-                "Commercial disputes",
-                "Breach of fiduciary duty"
-            ]
-        },
-        "timeline_effects": {
-            "immediate": "Circuit court adoption likely",
-            "short_term": "State court influence expected",
-            "long_term": "Potential Supreme Court review"
+            "future_impact": {
+                "similar_cases": {
+                    "count": similar_count,
+                    "outcome_distribution": outcome_analysis,
+                    "jurisdiction": jurisdiction
+                },
+                "related_areas": related_areas[:5]  # Top 5 areas
+            },
+            "timeline_effects": timeline_effects,
+            "network_analysis": {
+                "total_network_size": downstream_count + upstream_count,
+                "network_depth": "high" if upstream_count > 5 else "low",
+                "influence_score": round(strength_score, 2)
+            }
         }
-    }
-    
-    return {
-        "case_id": case_id,
-        "decision": decision,
-        "jurisdiction": jurisdiction,
-        "impact_analysis": impact_analysis
-    }
+        
+        return {
+            "case_id": case_id,
+            "case_name": case_data.get("case_name"),
+            "decision": decision,
+            "jurisdiction": jurisdiction,
+            "impact_analysis": impact_analysis,
+            "analysis_method": "real_citation_graph"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Fallback response
+        return {
+            "case_id": case_id,
+            "decision": decision,
+            "jurisdiction": jurisdiction,
+            "impact_analysis": {
+                "affected_cases": 0,
+                "precedent_strength": "unknown",
+                "citation_likelihood": 0.5,
+                "error": f"Analysis failed: {str(e)}"
+            },
+            "error": str(e)
+        }
 
 @app.get("/api/v1/trends/model")
 async def model_legal_evolution(legal_domain: str, time_horizon: str, Authorization: Optional[str] = Header(None)):
     """
-    Model legal evolution trends over time.
+    Model legal evolution trends over time - REAL TIME-SERIES ANALYSIS
     User Story 7: Legal Evolution Modeling
+    
+    Analyzes historical trends from legal_cases table using time-series analysis
     """
     require_auth(Authorization)
     
-    trend_analysis = {
-        "domain": legal_domain,
-        "time_period": time_horizon,
-        "evolution_patterns": [
-            {
-                "trend": "Increased digital evidence acceptance",
-                "strength": 0.89,
-                "direction": "rising"
-            },
-            {
-                "trend": "Alternative dispute resolution preference", 
-                "strength": 0.76,
-                "direction": "rising"
-            },
-            {
-                "trend": "Traditional precedent reliance",
-                "strength": 0.65,
-                "direction": "stable"
-            }
-        ],
-        "key_drivers": [
-            "Technology adoption",
-            "Cost pressures",
-            "Efficiency demands"
-        ],
-        "predictions": {
-            "next_5_years": "Continued digitization of legal processes",
-            "confidence": 0.82
+    try:
+        # Parse time horizon (e.g., "5_years", "10_years", "20_years")
+        years = 5
+        if "_" in time_horizon:
+            try:
+                years = int(time_horizon.split("_")[0])
+            except:
+                years = 5
+        
+        # Query all cases in the legal domain (case_type mapping)
+        domain_to_case_types = {
+            "contract_law": ["contract_dispute", "contract"],
+            "tort_law": ["tort", "personal_injury", "product_liability"],
+            "criminal_law": ["criminal", "criminal_defense"],
+            "employment_law": ["employment", "discrimination"],
+            "environmental_law": ["environmental"],
+            "corporate_law": ["corporate", "securities"]
         }
-    }
-    
-    return {"trend_analysis": trend_analysis}
+        
+        case_types = domain_to_case_types.get(legal_domain.lower(), [legal_domain])
+        
+        # Get all relevant cases
+        all_cases = []
+        for case_type in case_types:
+            resp = supabase.table("legal_cases").select("*").eq("case_type", case_type).execute()
+            if resp.data:
+                all_cases.extend(resp.data)
+        
+        if not all_cases:
+            # Fallback: get all cases
+            resp = supabase.table("legal_cases").select("*").limit(500).execute()
+            all_cases = resp.data if resp.data else []
+        
+        # Time-series analysis: group by year and analyze trends
+        yearly_stats = {}
+        current_year = datetime.now().year
+        start_year = current_year - years
+        
+        for case in all_cases:
+            decision_date = case.get("decision_date")
+            if not decision_date:
+                continue
+            
+            try:
+                year = datetime.fromisoformat(str(decision_date)).year
+                if year < start_year:
+                    continue
+                
+                if year not in yearly_stats:
+                    yearly_stats[year] = {
+                        "total_cases": 0,
+                        "plaintiff_wins": 0,
+                        "settlements": 0,
+                        "total_damages": 0,
+                        "avg_damages": 0,
+                        "citation_counts": []
+                    }
+                
+                stats = yearly_stats[year]
+                stats["total_cases"] += 1
+                
+                outcome = (case.get("outcome_label") or "").lower()
+                if "plaintiff" in outcome or "win" in outcome:
+                    stats["plaintiff_wins"] += 1
+                elif "settle" in outcome:
+                    stats["settlements"] += 1
+                
+                if case.get("damages_amount"):
+                    stats["total_damages"] += float(case["damages_amount"])
+                
+                if case.get("citation_count"):
+                    stats["citation_counts"].append(case["citation_count"])
+                    
+            except Exception:
+                continue
+        
+        # Calculate averages and trends
+        for year, stats in yearly_stats.items():
+            if stats["total_cases"] > 0:
+                stats["avg_damages"] = stats["total_damages"] / stats["total_cases"]
+                stats["plaintiff_win_rate"] = stats["plaintiff_wins"] / stats["total_cases"]
+                stats["settlement_rate"] = stats["settlements"] / stats["total_cases"]
+        
+        # Detect evolution patterns
+        evolution_patterns = []
+        
+        # 1. Settlement trend
+        settlement_rates = [(year, stats.get("settlement_rate", 0)) for year, stats in sorted(yearly_stats.items())]
+        if len(settlement_rates) >= 3:
+            recent_avg = np.mean([r for _, r in settlement_rates[-3:]])
+            early_avg = np.mean([r for _, r in settlement_rates[:3]] if len(settlement_rates) >= 3 else [settlement_rates[0][1]])
+            if recent_avg > early_avg * 1.2:
+                evolution_patterns.append({
+                    "trend": f"Increasing settlement rates in {legal_domain}",
+                    "strength": min(0.95, (recent_avg / early_avg) if early_avg > 0 else 0.5),
+                    "direction": "rising",
+                    "data": {"recent_rate": round(recent_avg, 2), "historical_rate": round(early_avg, 2)}
+                })
+            elif recent_avg < early_avg * 0.8:
+                evolution_patterns.append({
+                    "trend": f"Decreasing settlement rates in {legal_domain}",
+                    "strength": min(0.95, (early_avg / recent_avg) if recent_avg > 0 else 0.5),
+                    "direction": "falling",
+                    "data": {"recent_rate": round(recent_avg, 2), "historical_rate": round(early_avg, 2)}
+                })
+        
+        # 2. Damages trend
+        damages_by_year = [(year, stats.get("avg_damages", 0)) for year, stats in sorted(yearly_stats.items()) if stats.get("avg_damages", 0) > 0]
+        if len(damages_by_year) >= 2:
+            recent_damages = damages_by_year[-1][1] if damages_by_year else 0
+            early_damages = damages_by_year[0][1] if damages_by_year else 0
+            if recent_damages > early_damages * 1.3:
+                evolution_patterns.append({
+                    "trend": "Increasing damage awards",
+                    "strength": 0.75,
+                    "direction": "rising",
+                    "data": {"current_avg": round(recent_damages, 0), "historical_avg": round(early_damages, 0)}
+                })
+        
+        # 3. Case volume trend
+        case_counts = [(year, stats["total_cases"]) for year, stats in sorted(yearly_stats.items())]
+        if len(case_counts) >= 2:
+            recent_count = np.mean([c for _, c in case_counts[-2:]])
+            early_count = np.mean([c for _, c in case_counts[:2]])
+            if recent_count > early_count * 1.5:
+                evolution_patterns.append({
+                    "trend": f"Surge in {legal_domain} litigation",
+                    "strength": 0.80,
+                    "direction": "rising",
+                    "data": {"recent_volume": int(recent_count), "historical_volume": int(early_count)}
+                })
+        
+        # Identify key drivers based on patterns
+        key_drivers = []
+        if any(p["trend"].lower().find("settlement") >= 0 for p in evolution_patterns):
+            key_drivers.append("Cost considerations driving settlements")
+        if any(p["trend"].lower().find("damage") >= 0 for p in evolution_patterns):
+            key_drivers.append("Inflation and precedent shifts")
+        if any(p["trend"].lower().find("surge") >= 0 or p["trend"].lower().find("increasing") >= 0 for p in evolution_patterns):
+            key_drivers.append("Increased legal awareness and access")
+        
+        if not key_drivers:
+            key_drivers = ["Evolving legal standards", "Judicial interpretation shifts", "Societal changes"]
+        
+        # Make predictions based on trends
+        rising_trends = sum(1 for p in evolution_patterns if p["direction"] == "rising")
+        falling_trends = sum(1 for p in evolution_patterns if p["direction"] == "falling")
+        
+        if rising_trends > falling_trends:
+            prediction_text = f"Continued growth in {legal_domain} activity and complexity"
+            confidence = 0.75
+        elif falling_trends > rising_trends:
+            prediction_text = f"Stabilization or decline in {legal_domain} litigation"
+            confidence = 0.70
+        else:
+            prediction_text = f"Stable evolution of {legal_domain} with incremental changes"
+            confidence = 0.65
+        
+        trend_analysis = {
+            "domain": legal_domain,
+            "time_period": time_horizon,
+            "evolution_patterns": evolution_patterns if evolution_patterns else [
+                {
+                    "trend": "Insufficient historical data",
+                    "strength": 0.3,
+                    "direction": "stable"
+                }
+            ],
+            "key_drivers": key_drivers,
+            "predictions": {
+                f"next_{years}_years": prediction_text,
+                "confidence": confidence
+            },
+            "time_series_data": {
+                "years_analyzed": len(yearly_stats),
+                "total_cases_analyzed": sum(s["total_cases"] for s in yearly_stats.values()),
+                "yearly_breakdown": {str(year): {
+                    "cases": stats["total_cases"],
+                    "avg_damages": round(stats.get("avg_damages", 0), 0)
+                } for year, stats in sorted(yearly_stats.items())}
+            }
+        }
+        
+        return {
+            "trend_analysis": trend_analysis,
+            "analysis_method": "real_time_series"
+        }
+        
+    except Exception as e:
+        # Fallback
+        return {
+            "trend_analysis": {
+                "domain": legal_domain,
+                "time_period": time_horizon,
+                "evolution_patterns": [{"trend": "Analysis error", "strength": 0.5, "direction": "unknown"}],
+                "key_drivers": [],
+                "predictions": {"error": str(e), "confidence": 0}
+            },
+            "error": str(e)
+        }
 
 @app.post("/api/v1/compliance/optimize")
 async def optimize_compliance(payload: dict, Authorization: Optional[str] = Header(None)):
     """
-    Optimize compliance strategies for businesses.
+    Optimize compliance strategies for businesses - REAL COMPLIANCE FRAMEWORK DATABASE
     User Story 8: Compliance Optimization
+    
+    Uses compliance_frameworks and compliance_controls tables for data-driven recommendations
     """
     require_auth(Authorization)
     
@@ -889,30 +1321,167 @@ async def optimize_compliance(payload: dict, Authorization: Optional[str] = Head
     jurisdiction = payload.get("jurisdiction")
     current_practices = payload.get("current_practices", [])
     
-    controls = [
-        {
-            "id": "GDPR-001",
-            "description": "Implement comprehensive data mapping",
-            "priority": "P1",
-            "estimated_cost": "$25,000",
-            "timeline": "3 months"
-        },
-        {
-            "id": "SOX-002", 
-            "description": "Enhance financial reporting controls",
-            "priority": "P2",
-            "estimated_cost": "$15,000",
-            "timeline": "2 months"
+    try:
+        # Query applicable frameworks for this industry/jurisdiction
+        applicable_frameworks = []
+        
+        # Method 1: Check industry_compliance_map
+        map_resp = supabase.table("industry_compliance_map").select("*, compliance_frameworks(*)").eq("industry", industry).execute()
+        
+        if map_resp.data:
+            for mapping in map_resp.data:
+                framework_data = mapping.get("compliance_frameworks")
+                if framework_data:
+                    applicable_frameworks.append({
+                        "framework_id": framework_data.get("id"),
+                        "framework_code": framework_data.get("framework_code"),
+                        "framework_name": framework_data.get("framework_name"),
+                        "applicability_score": mapping.get("applicability_score", 0.5),
+                        "mandatory": mapping.get("mandatory", False)
+                    })
+        
+        # Method 2: Fallback - get frameworks that match industry in their array
+        if not applicable_frameworks:
+            frameworks_resp = supabase.table("compliance_frameworks").select("*").execute()
+            if frameworks_resp.data:
+                for fw in frameworks_resp.data:
+                    industries = fw.get("industry") or []
+                    if industry.lower() in [i.lower() for i in industries]:
+                        applicable_frameworks.append({
+                            "framework_id": fw.get("id"),
+                            "framework_code": fw.get("framework_code"),
+                            "framework_name": fw.get("framework_name"),
+                            "applicability_score": 0.7,
+                            "mandatory": False
+                        })
+        
+        # Get controls for applicable frameworks
+        all_controls = []
+        framework_ids = [fw["framework_id"] for fw in applicable_frameworks]
+        
+        for fw_id in framework_ids:
+            controls_resp = supabase.table("compliance_controls").select("*").eq("framework_id", fw_id).execute()
+            if controls_resp.data:
+                for control in controls_resp.data:
+                    # Check if already implemented
+                    control_code = control.get("control_code", "")
+                    already_implemented = any(
+                        practice.lower() in control.get("description", "").lower() 
+                        for practice in current_practices
+                    )
+                    
+                    if not already_implemented:  # Only recommend missing controls
+                        all_controls.append({
+                            "control_code": control_code,
+                            "framework": next((f["framework_code"] for f in applicable_frameworks if f["framework_id"] == fw_id), "Unknown"),
+                            "title": control.get("control_title"),
+                            "description": control.get("description"),
+                            "priority": control.get("priority"),
+                            "estimated_cost": float(control.get("estimated_cost") or 0),
+                            "timeline_days": control.get("implementation_timeline_days"),
+                            "category": control.get("control_category"),
+                            "requirements": control.get("requirements", [])
+                        })
+        
+        # Sort by priority (P1 > P2 > P3) and cost
+        priority_order = {"P1": 1, "P2": 2, "P3": 3}
+        all_controls.sort(key=lambda x: (priority_order.get(x["priority"], 99), x["estimated_cost"]))
+        
+        # Calculate risk assessment
+        total_mandatory = sum(1 for fw in applicable_frameworks if fw["mandatory"])
+        controls_needed = len(all_controls)
+        p1_controls = sum(1 for c in all_controls if c["priority"] == "P1")
+        
+        if p1_controls >= 5:
+            residual_risk = "high"
+            risk_score = 0.8
+        elif p1_controls >= 3:
+            residual_risk = "medium-high"
+            risk_score = 0.6
+        elif p1_controls >= 1:
+            residual_risk = "medium"
+            risk_score = 0.4
+        else:
+            residual_risk = "low"
+            risk_score = 0.2
+        
+        # Calculate total investment needed
+        total_cost = sum(c["estimated_cost"] for c in all_controls)
+        avg_timeline = int(np.mean([c["timeline_days"] for c in all_controls])) if all_controls else 0
+        
+        # Generate recommendations
+        recommendations = []
+        if p1_controls > 0:
+            recommendations.append(f"Prioritize {p1_controls} P1 controls immediately")
+        if total_mandatory > 0:
+            recommendations.append(f"Compliance with {total_mandatory} mandatory frameworks required")
+        if total_cost > 100000:
+            recommendations.append("Consider phased implementation to manage costs")
+        if avg_timeline > 120:
+            recommendations.append("Long implementation timeline - start planning now")
+        
+        if not recommendations:
+            recommendations.append("Maintain current compliance posture with periodic reviews")
+        
+        # Format controls for response
+        formatted_controls = []
+        for control in all_controls[:15]:  # Top 15 most important
+            formatted_controls.append({
+                "id": control["control_code"],
+                "framework": control["framework"],
+                "title": control["title"],
+                "description": control["description"],
+                "priority": control["priority"],
+                "estimated_cost": f"${control['estimated_cost']:,.0f}",
+                "timeline": f"{control['timeline_days']} days",
+                "category": control["category"],
+                "requirements": control["requirements"][:3]  # Top 3 requirements
+            })
+        
+        return {
+            "controls": formatted_controls,
+            "applicable_frameworks": [
+                {
+                    "code": fw["framework_code"],
+                    "name": fw["framework_name"],
+                    "mandatory": fw["mandatory"],
+                    "applicability": fw["applicability_score"]
+                } for fw in applicable_frameworks
+            ],
+            "risk_assessment": {
+                "residual_risk": residual_risk,
+                "risk_score": risk_score,
+                "p1_controls_needed": p1_controls,
+                "total_controls_needed": controls_needed
+            },
+            "investment_analysis": {
+                "total_estimated_cost": f"${total_cost:,.0f}",
+                "average_timeline_days": avg_timeline,
+                "recommended_budget_range": f"${total_cost * 0.8:,.0f} - ${total_cost * 1.2:,.0f}"
+            },
+            "recommendations": recommendations,
+            "industry": industry,
+            "jurisdiction": jurisdiction,
+            "current_practices": current_practices,
+            "analysis_method": "real_compliance_framework"
         }
-    ]
-    
-    return {
-        "controls": controls,
-        "residual_risk": "medium",
-        "industry": industry,
-        "jurisdiction": jurisdiction,
-        "current_practices": current_practices
-    }
+        
+    except Exception as e:
+        # Fallback response
+        return {
+            "controls": [{
+                "id": "ERROR",
+                "description": f"Analysis failed: {str(e)}",
+                "priority": "N/A",
+                "estimated_cost": "$0",
+                "timeline": "N/A"
+            }],
+            "residual_risk": "unknown",
+            "industry": industry,
+            "jurisdiction": jurisdiction,
+            "current_practices": current_practices,
+            "error": str(e)
+        }
 
 @app.get("/api/v1/arbitrage/alerts")
 async def get_arbitrage_alerts(user_role: str, jurisdiction: str, legal_interests: str, Authorization: Optional[str] = Header(None)):
@@ -962,45 +1531,225 @@ async def get_arbitrage_alerts(user_role: str, jurisdiction: str, legal_interest
 @app.get("/api/v1/precedent/predict")
 async def predict_landmark_cases(jurisdiction: str, case_details: str, Authorization: Optional[str] = Header(None)):
     """
-    Predict which current cases might become landmark decisions.
+    Predict which current cases might become landmark decisions - REAL ML-BASED PREDICTION
     User Story 9: Landmark Case Prediction
+    
+    Uses feature-based scoring to predict landmark potential based on:
+    - Citation network analysis
+    - Legal complexity indicators
+    - Court hierarchy
+    - Novel legal questions
+    - Jurisdictional importance
     """
     require_auth(Authorization)
     
     case_details_list = [d.strip() for d in case_details.split(',')]
     
-    predictions = [
-        {
-            "case_id": "SCOTUS-2024-001",
-            "case_name": "Tech Corp v. Privacy Board",
-            "landmark_probability": 0.87,
-            "factors": [
-                "Constitutional questions",
-                "Circuit split",
-                "National importance"
-            ],
-            "potential_impact": "Reshape digital privacy law",
-            "timeline": "12-18 months"
-        },
-        {
-            "case_id": "CA-2024-045",
-            "case_name": "AI Ethics v. Innovation Inc",
-            "landmark_probability": 0.72,
-            "factors": [
-                "Novel legal questions",
-                "Industry-wide implications",
-                "Regulatory uncertainty"
-            ],
-            "potential_impact": "Define AI liability standards",
-            "timeline": "6-12 months"
+    try:
+        # Get recent cases from the specified jurisdiction
+        recent_cutoff = datetime.now() - timedelta(days=730)  # Last 2 years
+        cases_resp = supabase.table("legal_cases").select("*").gte("decision_date", recent_cutoff.isoformat()).execute()
+        
+        if not cases_resp.data:
+            # Fallback: get all cases
+            cases_resp = supabase.table("legal_cases").select("*").limit(100).execute()
+        
+        all_cases = cases_resp.data if cases_resp.data else []
+        
+        # Filter by jurisdiction if provided
+        if jurisdiction and jurisdiction.lower() != "all":
+            all_cases = [c for c in all_cases if (c.get("jurisdiction") or "").lower() == jurisdiction.lower()]
+        
+        # Calculate landmark probability for each case using feature-based scoring
+        predictions = []
+        
+        for case in all_cases[:50]:  # Limit to top 50 recent cases
+            case_id = case.get("case_id")
+            case_name = case.get("case_name")
+            court = (case.get("court") or "").lower()
+            case_type = case.get("case_type")
+            
+            # Feature extraction
+            features = {}
+            
+            # 1. Court hierarchy score (higher courts = higher landmark potential)
+            if "supreme" in court:
+                features["court_level_score"] = 1.0
+            elif "circuit" in court or "appeals" in court:
+                features["court_level_score"] = 0.75
+            elif "district" in court:
+                features["court_level_score"] = 0.4
+            else:
+                features["court_level_score"] = 0.3
+            
+            # 2. Citation network analysis
+            citing_resp = supabase.table("precedent_relationships").select("from_case").eq("to_case", case_id).execute()
+            cited_resp = supabase.table("precedent_relationships").select("to_case").eq("from_case", case_id).execute()
+            
+            citation_count = len(citing_resp.data) if citing_resp.data else 0
+            upstream_citations = len(cited_resp.data) if cited_resp.data else 0
+            
+            # Normalize citation score
+            features["citation_network_score"] = min(1.0, citation_count / 10)  # Max score at 10+ citations
+            features["legal_depth_score"] = min(1.0, upstream_citations / 15)  # Cases citing many precedents = complex
+            
+            # 3. Case age and recency (recent cases with growing citations)
+            case_age_days = 365
+            if case.get("decision_date"):
+                try:
+                    decision_date = datetime.fromisoformat(str(case["decision_date"]))
+                    case_age_days = (datetime.now() - decision_date).days
+                except:
+                    pass
+            
+            # Recent but not too new (need time to accumulate citations)
+            if 90 < case_age_days < 730:
+                features["recency_score"] = 0.9
+            elif 30 < case_age_days <= 90:
+                features["recency_score"] = 0.6  # Too new
+            else:
+                features["recency_score"] = 0.4  # Too old or too new
+            
+            # 4. Citation velocity (citations per month)
+            if case_age_days > 30:
+                citation_velocity = citation_count / (case_age_days / 30)
+                features["velocity_score"] = min(1.0, citation_velocity)
+            else:
+                features["velocity_score"] = 0.3
+            
+            # 5. Legal complexity (metadata analysis)
+            complexity_score = 0.5  # Default
+            if case.get("metadata"):
+                metadata = case["metadata"]
+                if isinstance(metadata, dict):
+                    # Check for complexity indicators
+                    if metadata.get("complexity") == "high":
+                        complexity_score = 0.9
+                    elif metadata.get("precedent_strength") in ["strong", "moderate"]:
+                        complexity_score = 0.75
+                    
+                    # Novel legal issues
+                    if metadata.get("legal_issues"):
+                        issues_count = len(metadata.get("legal_issues", []))
+                        complexity_score += min(0.2, issues_count * 0.05)
+            
+            features["complexity_score"] = min(1.0, complexity_score)
+            
+            # 6. Damages amount (high-stakes cases)
+            damages = case.get("damages_amount") or 0
+            if damages > 10000000:  # >$10M
+                features["stakes_score"] = 1.0
+            elif damages > 1000000:  # >$1M
+                features["stakes_score"] = 0.7
+            elif damages > 100000:  # >$100K
+                features["stakes_score"] = 0.4
+            else:
+                features["stakes_score"] = 0.2
+            
+            # Calculate weighted landmark probability
+            weights = {
+                "court_level_score": 0.25,
+                "citation_network_score": 0.20,
+                "legal_depth_score": 0.15,
+                "recency_score": 0.10,
+                "velocity_score": 0.15,
+                "complexity_score": 0.10,
+                "stakes_score": 0.05
+            }
+            
+            landmark_probability = sum(features.get(k, 0) * w for k, w in weights.items())
+            
+            # Only include cases with decent probability
+            if landmark_probability < 0.4:
+                continue
+            
+            # Identify key factors
+            factors = []
+            if features["court_level_score"] >= 0.75:
+                factors.append(f"High-level court: {case.get('court')}")
+            if features["citation_network_score"] >= 0.5:
+                factors.append(f"Strong citation network: {citation_count} citations")
+            if features["velocity_score"] >= 0.5:
+                factors.append(f"High citation velocity: growing influence")
+            if features["complexity_score"] >= 0.7:
+                factors.append("Complex legal questions")
+            if features["stakes_score"] >= 0.7:
+                factors.append(f"High stakes: ${damages:,.0f} in damages")
+            if not factors:
+                factors.append("General precedent potential")
+            
+            # Estimate timeline to landmark status
+            if citation_count >= 5:
+                timeline = "6-12 months"
+            elif citation_count >= 2:
+                timeline = "12-18 months"
+            else:
+                timeline = "18-24 months"
+            
+            # Predict potential impact
+            impact_areas = []
+            if case_type:
+                impact_areas.append(f"{case_type.replace('_', ' ').title()} law")
+            if case.get("metadata") and isinstance(case["metadata"], dict):
+                if case["metadata"].get("legal_issues"):
+                    impact_areas.extend(case["metadata"]["legal_issues"][:2])
+            
+            potential_impact = ", ".join(impact_areas) if impact_areas else "Broad legal precedent"
+            
+            predictions.append({
+                "case_id": case_id,
+                "case_name": case_name,
+                "landmark_probability": round(landmark_probability, 2),
+                "factors": factors[:4],  # Top 4 factors
+                "potential_impact": potential_impact,
+                "timeline": timeline,
+                "feature_scores": {k: round(v, 2) for k, v in features.items()},
+                "court": case.get("court"),
+                "decision_date": case.get("decision_date")
+            })
+        
+        # Sort by probability descending
+        predictions.sort(key=lambda x: x["landmark_probability"], reverse=True)
+        
+        # Return top 10
+        predictions = predictions[:10]
+        
+        if not predictions:
+            predictions = [{
+                "case_id": "N/A",
+                "case_name": "No qualifying cases found",
+                "landmark_probability": 0.0,
+                "factors": ["Insufficient data for prediction"],
+                "potential_impact": "N/A",
+                "timeline": "N/A"
+            }]
+        
+        return {
+            "predictions": predictions,
+            "jurisdiction": jurisdiction,
+            "case_details": case_details_list,
+            "analysis_method": "ml_feature_based",
+            "total_cases_analyzed": len(all_cases),
+            "methodology": {
+                "features_used": list(weights.keys()),
+                "feature_weights": weights
+            }
         }
-    ]
-    
-    return {
-        "predictions": predictions,
-        "jurisdiction": jurisdiction,
-        "case_details": case_details_list
-    }
+        
+    except Exception as e:
+        return {
+            "predictions": [{
+                "case_id": "ERROR",
+                "case_name": "Analysis failed",
+                "landmark_probability": 0.0,
+                "factors": [f"Error: {str(e)}"],
+                "potential_impact": "N/A",
+                "timeline": "N/A"
+            }],
+            "jurisdiction": jurisdiction,
+            "case_details": case_details_list,
+            "error": str(e)
+        }
 
 # -------------------------
 # Run server

@@ -16,11 +16,6 @@ export { default as DocumentAnalysis } from './DocumentAnalysis'
 // Error boundary for robust error handling
 export { ErrorBoundary } from './ErrorBoundary'
 
-// Test utilities (if needed)
-// export * from './test-utils'
-// export { default as MultiPlayerScenarios } from './MultiPlayerScenarios'
-// export { default as StrategicIntelligence } from './StrategicIntelligence'
-// export { default as LegalTrends } from './LegalTrends'
-// export { default as CoalitionAnalysis } from './CoalitionAnalysis'
-// export { default as NegotiationModeling } from './NegotiationModeling'
-// export { default as CaseSimilarity } from './CaseSimilarity'
+// Authentication components
+export { AuthPage } from './AuthPage'
+export { ProtectedRoute } from './ProtectedRoute'

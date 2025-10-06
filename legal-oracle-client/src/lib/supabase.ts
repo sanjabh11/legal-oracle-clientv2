@@ -133,9 +133,9 @@ export class LegalDatabaseService {
   // Fetch caselaw cache entries
   static async getCaselawEntries(limit = 50) {
     const { data, error } = await supabase
-      .from('legal_oracle_caselaw_cache')
+      .from('caselaw_cache')
       .select('*')
-      .order('fetch_timestamp', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(limit)
     
     if (error) {
@@ -162,9 +162,9 @@ export class LegalDatabaseService {
   // Search similar cases using text similarity
   static async searchSimilarCases(searchText: string, limit = 10) {
     const { data, error } = await supabase
-      .from('legal_oracle_caselaw_cache')
+      .from('caselaw_cache')
       .select('*')
-      .textSearch('case_text', searchText)
+      .textSearch('summary', searchText)
       .limit(limit)
     
     if (error) {

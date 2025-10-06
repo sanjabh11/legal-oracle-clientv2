@@ -14,7 +14,9 @@ import {
   SettlementAnalysis,
   MultiPlayerScenarios,
   StrategicIntelligence,
-  CoalitionAnalysis
+  CoalitionAnalysis,
+  AuthPage,
+  ProtectedRoute
 } from './components'
 import DocumentAnalysis from './components/DocumentAnalysis'
 
@@ -30,20 +32,25 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
         <LegalOracleHeader />
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/case-prediction" element={<CasePrediction />} />
-          <Route path="/judge-analysis" element={<JudgeAnalysis />} />
-          <Route path="/nash-equilibrium" element={<NashEquilibrium />} />
-          <Route path="/document-analysis" element={<DocumentAnalysis />} />
-          <Route path="/game-theory" element={<NashEquilibrium />} />
-          <Route path="/trend-forecasting" element={<TrendForecasting />} />
-          <Route path="/jurisdiction-optimizer" element={<JurisdictionOptimizer />} />
-          <Route path="/legal-trends" element={<TrendForecasting />} />
-          <Route path="/precedent-search" element={<PrecedentSearch />} />
-          <Route path="/settlement-analysis" element={<SettlementAnalysis />} />
-          <Route path="/multi-player" element={<MultiPlayerScenarios />} />
-          <Route path="/strategic-intelligence" element={<StrategicIntelligence />} />
-          <Route path="/coalition-analysis" element={<CoalitionAnalysis />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/signup" element={<AuthPage mode="signup" />} />
+          
+          {/* Protected routes - guest mode allowed */}
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/case-prediction" element={<ProtectedRoute><CasePrediction /></ProtectedRoute>} />
+          <Route path="/judge-analysis" element={<ProtectedRoute><JudgeAnalysis /></ProtectedRoute>} />
+          <Route path="/nash-equilibrium" element={<ProtectedRoute><NashEquilibrium /></ProtectedRoute>} />
+          <Route path="/document-analysis" element={<ProtectedRoute><DocumentAnalysis /></ProtectedRoute>} />
+          <Route path="/game-theory" element={<ProtectedRoute><NashEquilibrium /></ProtectedRoute>} />
+          <Route path="/trend-forecasting" element={<ProtectedRoute><TrendForecasting /></ProtectedRoute>} />
+          <Route path="/jurisdiction-optimizer" element={<ProtectedRoute><JurisdictionOptimizer /></ProtectedRoute>} />
+          <Route path="/legal-trends" element={<ProtectedRoute><TrendForecasting /></ProtectedRoute>} />
+          <Route path="/precedent-search" element={<ProtectedRoute><PrecedentSearch /></ProtectedRoute>} />
+          <Route path="/settlement-analysis" element={<ProtectedRoute><SettlementAnalysis /></ProtectedRoute>} />
+          <Route path="/multi-player" element={<ProtectedRoute><MultiPlayerScenarios /></ProtectedRoute>} />
+          <Route path="/strategic-intelligence" element={<ProtectedRoute><StrategicIntelligence /></ProtectedRoute>} />
+          <Route path="/coalition-analysis" element={<ProtectedRoute><CoalitionAnalysis /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

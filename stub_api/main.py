@@ -711,48 +711,91 @@ async def get_model_calibration():
 @app.get("/api/v1/trends/forecast")
 async def forecast_trends(industry: str, jurisdictions: str, time_horizon: str, Authorization: Optional[str] = Header(None)):
     """
-    Forecast regulatory changes for given industry and jurisdictions.
+    Forecast regulatory changes for given industry and jurisdictions - REAL DATA VERSION
     User Story 4: Regulatory Change Forecasting
+    
+    Uses Federal Register API + ML forecasting for accurate predictions
     """
     require_auth(Authorization)
     
+    from regulatory_api import fetch_proposed_regulations, parse_regulation_impact
+    from ml_forecasting import RegulatoryForecaster, calculate_regulatory_risk_score
+    
     jurisdictions_list = [j.strip() for j in jurisdictions.split(',')]
     
-    # Mock implementation with realistic data structure
-    predicted_changes = [
-        {
-            "change_type": "AI Regulation",
-            "probability": 0.85,
-            "timeline": "6-12 months",
-            "impact_level": "high",
-            "description": f"New AI governance regulations expected in {jurisdictions_list[0]}"
-        },
-        {
-            "change_type": "Data Privacy",
-            "probability": 0.72,
-            "timeline": "12-18 months", 
-            "impact_level": "medium",
-            "description": "Enhanced data protection requirements"
-        }
-    ]
+    # Parse time horizon to months
+    horizon_map = {"short": 6, "medium": 12, "long": 24}
+    horizon_months = horizon_map.get(time_horizon.lower(), 12)
     
+    # Fetch real proposed regulations from Federal Register
+    timeframe_days = min(horizon_months * 30, 365)
+    regulations_data = await fetch_proposed_regulations(
+        industry=industry,
+        timeframe_days=timeframe_days,
+        per_page=50
+    )
+    
+    # Parse and analyze regulations
+    predicted_changes = []
+    if regulations_data.get("count", 0) > 0:
+        for reg in regulations_data["results"][:10]:
+            parsed = parse_regulation_impact(reg)
+            if parsed:
+                predicted_changes.append({
+                    "change_type": parsed.get("title", "")[:80],
+                    "probability": min(0.95, parsed.get("impact_score", 5) / 10),
+                    "timeline": f"{parsed.get('estimated_compliance_months', 6)} months",
+                    "impact_level": parsed.get("urgency", "medium"),
+                    "description": parsed.get("abstract", "")[:200],
+                    "document_number": parsed.get("document_number"),
+                    "agencies": parsed.get("agencies", []),
+                    "affected_areas": parsed.get("affected_areas", [])
+                })
+    
+    # ML Forecasting
+    forecaster = RegulatoryForecaster()
+    forecast_result = forecaster.forecast(
+        historical_data=regulations_data.get("results", []),
+        horizon_months=horizon_months,
+        method="auto"
+    )
+    
+    # Risk assessment
+    risk_assessment = calculate_regulatory_risk_score(
+        forecast=forecast_result,
+        current_volume=regulations_data.get("count", 0)
+    )
+    
+    # Impact analysis
     impact_analysis = {
-        "compliance_cost_increase": "15-25%",
+        "compliance_cost_increase": f"{int(risk_assessment['risk_score'] * 3)}-{int(risk_assessment['risk_score'] * 5)}%",
         "implementation_timeline": time_horizon,
-        "risk_level": "medium",
-        "recommended_actions": [
-            "Monitor regulatory developments",
-            "Prepare compliance framework",
-            "Engage with regulatory bodies"
-        ]
+        "risk_level": risk_assessment["risk_level"],
+        "risk_score": risk_assessment["risk_score"],
+        "recommended_actions": [risk_assessment["recommendation"]],
+        "forecast_trend": forecast_result.get("trend", "stable"),
+        "forecast_confidence": forecast_result.get("confidence", 0.5)
     }
     
+    if risk_assessment["risk_level"] == "high":
+        impact_analysis["recommended_actions"].extend([
+            "Allocate additional compliance resources",
+            "Engage legal counsel proactively"
+        ])
+    
     return {
-        "predicted_changes": predicted_changes,
+        "predicted_changes": predicted_changes[:10],
         "impact_analysis": impact_analysis,
+        "forecast": {
+            "trend": forecast_result.get("trend"),
+            "confidence": forecast_result.get("confidence"),
+            "values": forecast_result.get("forecast_values", [])[:6]
+        },
         "industry": industry,
         "jurisdictions": jurisdictions_list,
-        "time_horizon": time_horizon
+        "time_horizon": time_horizon,
+        "real_data": True,
+        "regulations_analyzed": regulations_data.get("count", 0)
     }
 
 @app.get("/api/v1/jurisdiction/optimize")
@@ -1490,46 +1533,69 @@ async def optimize_compliance(payload: dict, Authorization: Optional[str] = Head
 @app.get("/api/v1/arbitrage/alerts")
 async def get_arbitrage_alerts(user_role: str, jurisdiction: str, legal_interests: str, Authorization: Optional[str] = Header(None)):
     """
-    Identify legal arbitrage opportunities.
+    Identify legal arbitrage opportunities - REAL DATA VERSION
     User Story 10: Legal Arbitrage Alerts
+    
+    Uses real-time monitoring of regulations and case law for temporary advantages
     """
     require_auth(Authorization)
     
+    from arbitrage_monitor import ArbitrageMonitor, format_opportunity_for_api
+    from regulatory_api import fetch_proposed_regulations
+    
     legal_interests_list = [i.strip() for i in legal_interests.split(',')]
     
-    opportunities = [
-        {
-            "id": "ARB-001",
-            "type": "Tax Advantage",
-            "description": "Delaware incorporation benefits for tech companies",
-            "window": "6 months",
-            "potential_savings": "$50,000-$200,000",
-            "complexity": "medium",
-            "requirements": [
-                "Reincorporation process",
-                "Board resolution",
-                "Shareholder approval"
-            ]
-        },
-        {
-            "id": "ARB-002",
-            "type": "Regulatory Gap",
-            "description": "Federal vs state jurisdiction arbitrage opportunity",
-            "window": "3 months",
-            "potential_savings": "$25,000-$75,000",
-            "complexity": "low",
-            "requirements": [
-                "Filing in federal court",
-                "Jurisdictional analysis"
-            ]
-        }
+    # Fetch recent regulations (last 6 months)
+    regulations_data = await fetch_proposed_regulations(
+        industry=legal_interests_list[0] if legal_interests_list else "technology",
+        timeframe_days=180,
+        per_page=50
+    )
+    
+    # Fetch case data for circuit split detection
+    try:
+        case_query = supabase.table("legal_cases").select("*").limit(100).execute()
+        case_data = case_query.data if case_query else []
+    except Exception as e:
+        logger.error(f"Error fetching cases: {str(e)}")
+        case_data = []
+    
+    # Run arbitrage detection
+    monitor = ArbitrageMonitor()
+    opportunities = await monitor.scan_for_opportunities(
+        regulations=regulations_data.get("results", []),
+        case_data=case_data
+    )
+    
+    # Format for API response
+    formatted_opportunities = [
+        format_opportunity_for_api(opp) for opp in opportunities[:20]  # Top 20
     ]
     
+    # Filter by jurisdiction if specified
+    if jurisdiction and jurisdiction.lower() != "all":
+        formatted_opportunities = [
+            opp for opp in formatted_opportunities
+            if jurisdiction.lower() in " ".join(opp.get("jurisdictions", [])).lower()
+        ]
+    
+    # Add estimated savings based on opportunity score
+    for opp in formatted_opportunities:
+        score = opp.get("opportunity_score", 0.5)
+        base_savings = 50000
+        potential_savings = int(base_savings * score)
+        opp["potential_savings"] = f"${potential_savings:,}-${potential_savings * 2:,}"
+        opp["complexity"] = "high" if score > 0.8 else "medium" if score > 0.6 else "low"
+    
     return {
-        "opportunities": opportunities,
+        "opportunities": formatted_opportunities,
+        "total_found": len(opportunities),
         "user_role": user_role,
         "jurisdiction": jurisdiction,
-        "legal_interests": legal_interests_list
+        "legal_interests": legal_interests_list,
+        "real_data": True,
+        "data_sources": ["Federal Register API", "Legal Cases Database"],
+        "detection_types": ["sunset_clauses", "jurisdictional_conflicts", "temporary_exemptions", "transition_periods"]
     }
 
 @app.get("/api/v1/precedent/predict")

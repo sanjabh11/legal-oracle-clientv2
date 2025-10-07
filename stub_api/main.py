@@ -1822,7 +1822,363 @@ async def predict_landmark_cases(jurisdiction: str, case_details: str, Authoriza
         }
 
 # -------------------------
+# Scheduled Tasks Integration
+# -------------------------
+try:
+    from scheduled_tasks import start_scheduler, stop_scheduler, get_scheduler_status, manual_trigger_scan
+    from email_service import AlertEmailService
+    SCHEDULER_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Scheduled tasks not available: {e}")
+    SCHEDULER_AVAILABLE = False
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize background tasks on server startup"""
+    print("[INFO] Starting Legal Oracle API...")
+    
+    if SCHEDULER_AVAILABLE:
+        success = start_scheduler()
+        if success:
+            print("[OK] Background scheduler initialized")
+        else:
+            print("[WARN] Failed to start scheduler")
+    else:
+        print("[WARN] Scheduler not available - install apscheduler for background tasks")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up on server shutdown"""
+    print("[INFO] Shutting down Legal Oracle API...")
+    
+    if SCHEDULER_AVAILABLE:
+        stop_scheduler()
+        print("[OK] Scheduler stopped")
+
+# -------------------------
+# Alert System Endpoints
+# -------------------------
+
+class AlertSubscriptionRequest(BaseModel):
+    user_email: str
+    industry: Optional[str] = None
+    jurisdictions: Optional[List[str]] = None
+    alert_types: Optional[List[str]] = None
+    frequency: str = "daily"
+
+@app.post("/api/v1/alerts/subscribe")
+async def subscribe_to_alerts(
+    request: AlertSubscriptionRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Subscribe user to regulatory arbitrage alerts
+    
+    Args:
+        user_email: Email address for alerts
+        industry: Industry to monitor (technology, healthcare, finance, etc.)
+        jurisdictions: List of jurisdictions to monitor
+        alert_types: Types of alerts (sunset_clause, jurisdictional_conflict, etc.)
+        frequency: How often to receive alerts (realtime, daily, weekly)
+    """
+    require_auth(Authorization)
+    
+    try:
+        # Check if subscription already exists
+        existing = supabase.table("user_alert_subscriptions") \
+            .select("*") \
+            .eq("user_email", request.user_email) \
+            .maybe_single() \
+            .execute()
+        
+        if existing.data:
+            # Update existing subscription
+            result = supabase.table("user_alert_subscriptions") \
+                .update({
+                    "industry": request.industry,
+                    "jurisdictions": request.jurisdictions,
+                    "alert_types": request.alert_types or ["sunset_clause", "jurisdictional_conflict"],
+                    "frequency": request.frequency,
+                    "is_active": True,
+                    "updated_at": datetime.now().isoformat()
+                }) \
+                .eq("id", existing.data["id"]) \
+                .execute()
+            
+            return {
+                "status": "updated",
+                "subscription_id": existing.data["id"],
+                "message": "Subscription preferences updated successfully"
+            }
+        else:
+            # Create new subscription
+            result = supabase.table("user_alert_subscriptions") \
+                .insert({
+                    "user_email": request.user_email,
+                    "industry": request.industry,
+                    "jurisdictions": request.jurisdictions,
+                    "alert_types": request.alert_types or ["sunset_clause", "jurisdictional_conflict"],
+                    "frequency": request.frequency,
+                    "is_active": True
+                }) \
+                .execute()
+            
+            return {
+                "status": "created",
+                "subscription_id": result.data[0]["id"] if result.data else None,
+                "message": "Successfully subscribed to alerts"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Subscription failed: {str(e)}")
+
+@app.get("/api/v1/alerts/subscription/{user_email}")
+async def get_subscription(
+    user_email: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """Get user's current alert subscription"""
+    require_auth(Authorization)
+    
+    try:
+        result = supabase.table("user_alert_subscriptions") \
+            .select("*") \
+            .eq("user_email", user_email) \
+            .maybe_single() \
+            .execute()
+        
+        if result.data:
+            return {
+                "subscription": result.data,
+                "status": "active" if result.data.get("is_active") else "inactive"
+            }
+        else:
+            return {
+                "subscription": None,
+                "status": "not_found",
+                "message": "No subscription found for this email"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch subscription: {str(e)}")
+
+@app.delete("/api/v1/alerts/unsubscribe/{user_email}")
+async def unsubscribe_from_alerts(
+    user_email: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """Unsubscribe user from alerts"""
+    require_auth(Authorization)
+    
+    try:
+        result = supabase.table("user_alert_subscriptions") \
+            .update({"is_active": False}) \
+            .eq("user_email", user_email) \
+            .execute()
+        
+        return {
+            "status": "unsubscribed",
+            "message": "Successfully unsubscribed from alerts"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unsubscribe failed: {str(e)}")
+
+@app.post("/api/v1/admin/trigger_alert_scan")
+async def trigger_manual_scan(Authorization: Optional[str] = Header(None)):
+    """
+    Manually trigger regulatory scan and alert sending (admin only)
+    """
+    require_auth(Authorization)
+    
+    if not SCHEDULER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Scheduler not available")
+    
+    try:
+        # Run scan asynchronously
+        import asyncio
+        asyncio.create_task(manual_trigger_scan())
+        
+        return {
+            "status": "triggered",
+            "message": "Manual scan initiated. Check logs for progress."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scan: {str(e)}")
+
+@app.get("/api/v1/admin/scheduler_status")
+async def get_scheduler_status_endpoint(Authorization: Optional[str] = Header(None)):
+    """
+    Get current scheduler status (admin only)
+    """
+    require_auth(Authorization)
+    
+    if not SCHEDULER_AVAILABLE:
+        return {
+            "running": False,
+            "reason": "Scheduler not available - install apscheduler"
+        }
+    
+    try:
+        status = get_scheduler_status()
+        return status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+@app.get("/api/v1/alerts/recent_opportunities")
+async def get_recent_opportunities(
+    industry: Optional[str] = None,
+    limit: int = 20,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Get recently detected arbitrage opportunities
+    """
+    require_auth(Authorization)
+    
+    try:
+        query = supabase.table("detected_opportunities") \
+            .select("*") \
+            .eq("is_active", True) \
+            .order("detection_date", desc=True) \
+            .limit(limit)
+        
+        if industry:
+            query = query.eq("industry", industry)
+        
+        result = query.execute()
+        
+        return {
+            "opportunities": result.data or [],
+            "count": len(result.data) if result.data else 0,
+            "industry_filter": industry
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch opportunities: {str(e)}")
+
+# -------------------------
+# Multi-Agent Workflow Endpoints
+# -------------------------
+
+try:
+    from workflow_orchestrator import CaseWorkflowOrchestrator
+    from report_generator import generate_workflow_report_pdf, generate_simple_text_report
+    from fastapi.responses import StreamingResponse
+    WORKFLOW_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Workflow orchestrator not available: {e}")
+    WORKFLOW_AVAILABLE = False
+
+class WorkflowRequest(BaseModel):
+    case_text: str
+    case_type: str
+    jurisdiction: str
+    damages_amount: Optional[float] = None
+
+# In-memory cache for workflow results (use Redis in production)
+workflow_cache = {}
+
+@app.post("/api/v1/workflow/full_analysis")
+async def run_full_workflow(
+    request: WorkflowRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Run complete multi-agent workflow for case analysis
+    
+    This endpoint orchestrates:
+    1. Fact Extraction - Extract key entities and legal concepts
+    2. Precedent Retrieval - Find similar cases
+    3. Risk Assessment - Calculate win probability
+    4. Strategy Optimization - Recommend optimal strategies
+    5. Report Synthesis - Generate comprehensive report
+    
+    Returns comprehensive analysis report
+    """
+    require_auth(Authorization)
+    
+    if not WORKFLOW_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Workflow orchestrator not available")
+    
+    try:
+        orchestrator = CaseWorkflowOrchestrator()
+        report = await orchestrator.run_full_analysis(
+            case_text=request.case_text,
+            case_type=request.case_type,
+            jurisdiction=request.jurisdiction,
+            damages_amount=request.damages_amount
+        )
+        
+        # Cache the report for PDF generation
+        workflow_id = report.get("workflow_id")
+        if workflow_id:
+            workflow_cache[workflow_id] = report
+        
+        return report
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow failed: {str(e)}")
+
+@app.get("/api/v1/workflow/report/{workflow_id}/pdf")
+async def download_workflow_pdf(
+    workflow_id: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Download PDF report for a completed workflow
+    """
+    require_auth(Authorization)
+    
+    # Check cache
+    workflow_data = workflow_cache.get(workflow_id)
+    
+    if not workflow_data:
+        raise HTTPException(status_code=404, detail="Workflow not found. Please run analysis first.")
+    
+    try:
+        pdf_buffer = generate_workflow_report_pdf(workflow_data)
+        
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=legal_analysis_{workflow_id}.pdf"
+            }
+        )
+    except ImportError:
+        # Fallback to text report if reportlab not available
+        text_report = generate_simple_text_report(workflow_data)
+        return Response(
+            content=text_report,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f"attachment; filename=legal_analysis_{workflow_id}.txt"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+@app.get("/api/v1/workflow/report/{workflow_id}")
+async def get_workflow_report(
+    workflow_id: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Get workflow report as JSON
+    """
+    require_auth(Authorization)
+    
+    workflow_data = workflow_cache.get(workflow_id)
+    
+    if not workflow_data:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    
+    return workflow_data
+
+# -------------------------
 # Run server
 # -------------------------
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))

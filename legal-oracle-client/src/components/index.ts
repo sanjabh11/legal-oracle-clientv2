@@ -19,3 +19,8 @@ export { ErrorBoundary } from './ErrorBoundary'
 // Authentication components
 export { AuthPage } from './AuthPage'
 export { ProtectedRoute } from './ProtectedRoute'
+
+// Phase I New Components (Oct 2025)
+export { default as AlertSubscriptions } from './AlertSubscriptions'
+export { default as MultiAgentWorkflow } from './MultiAgentWorkflow'
+export { default as AnalyticsDashboard } from './AnalyticsDashboard'

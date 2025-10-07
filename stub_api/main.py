@@ -11,6 +11,10 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import openai
 from uuid import uuid4
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # -------------------------
 # Configuration & clients

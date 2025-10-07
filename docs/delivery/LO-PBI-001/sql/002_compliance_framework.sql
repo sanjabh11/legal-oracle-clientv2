@@ -44,8 +44,11 @@ CREATE TABLE IF NOT EXISTS industry_compliance_map (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Drop and recreate strategic_patterns table with correct schema
+DROP TABLE IF EXISTS strategic_patterns CASCADE;
+
 -- Strategic patterns table (for game theory)
-CREATE TABLE IF NOT EXISTS strategic_patterns (
+CREATE TABLE strategic_patterns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pattern_name TEXT NOT NULL,
   case_type TEXT,

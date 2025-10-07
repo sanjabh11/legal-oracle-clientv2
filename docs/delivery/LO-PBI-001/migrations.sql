@@ -2,9 +2,15 @@
 -- Enable pgvector extension (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Drop existing tables with incompatible schemas (CASCADE to handle foreign keys)
+DROP TABLE IF EXISTS precedent_relationships CASCADE;
+DROP TABLE IF EXISTS caselaw_cache CASCADE;
+
 -- legal_cases table (core case data)
+-- Note: Using UUID to match existing database schema
 CREATE TABLE IF NOT EXISTS legal_cases (
-  case_id text PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id text,
   case_name text,
   court text,
   jurisdiction text,
@@ -21,8 +27,9 @@ CREATE TABLE IF NOT EXISTS legal_cases (
 );
 
 -- caselaw_cache for embeddings and fast search
-CREATE TABLE IF NOT EXISTS caselaw_cache (
-  case_id text PRIMARY KEY,
+CREATE TABLE caselaw_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id text,
   title text,
   summary text,
   embedding vector(384),
@@ -31,11 +38,12 @@ CREATE TABLE IF NOT EXISTS caselaw_cache (
 );
 
 -- Index for vector distance (pgvector)
-CREATE INDEX IF NOT EXISTS idx_caselaw_embedding ON caselaw_cache USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+CREATE INDEX idx_caselaw_embedding ON caselaw_cache USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
 
 -- judge_patterns (judge behavioral data)
 CREATE TABLE IF NOT EXISTS judge_patterns (
-  judge_id text PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  judge_id text,
   judge_name text,
   reversal_rate numeric,
   avg_damages numeric,
@@ -44,11 +52,11 @@ CREATE TABLE IF NOT EXISTS judge_patterns (
   updated_at timestamptz DEFAULT now()
 );
 
--- precedent_relationships (links between cases)
-CREATE TABLE IF NOT EXISTS precedent_relationships (
-  id bigserial PRIMARY KEY,
-  from_case text REFERENCES legal_cases(case_id),
-  to_case text REFERENCES legal_cases(case_id),
+-- precedent_relationships (links between cases) - RECREATED with correct UUID types
+CREATE TABLE precedent_relationships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_case UUID REFERENCES legal_cases(id) ON DELETE CASCADE,
+  to_case UUID REFERENCES legal_cases(id) ON DELETE CASCADE,
   relation_type text, -- "cites", "overruled_by", etc.
   created_at timestamptz DEFAULT now()
 );

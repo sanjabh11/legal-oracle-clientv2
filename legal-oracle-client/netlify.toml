@@ -1,0 +1,55 @@
+# Netlify configuration for Legal Oracle Frontend
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  # Build command
+  command = "npm run build"
+  
+  # Directory with build output
+  publish = "dist"
+  
+  # Base directory (if your app is in a subdirectory)
+  base = "legal-oracle-client"
+
+[build.environment]
+  # Node version
+  NODE_VERSION = "18"
+  
+  # Use npm ci for faster, more reliable builds
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Redirect all requests to index.html for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Cache static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment-specific build contexts
+[context.production]
+  command = "npm run build:prod"
+  
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"
+
+# Functions configuration (if using Netlify Functions in future)
+[functions]
+  directory = "netlify/functions"

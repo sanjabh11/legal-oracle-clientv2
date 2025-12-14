@@ -44,3 +44,6 @@ export { WhopCallback } from './WhopCallback'
 
 // Decision Tree Visualization (Addendum PRD v2.2)
 export { DecisionTree, generateLitigationTree } from './DecisionTree'
+
+// Community Template Submission
+export { TemplateSubmission } from './TemplateSubmission'

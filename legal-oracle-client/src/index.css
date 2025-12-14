@@ -61,3 +61,111 @@ img {
     transform: none !important;
   }
 }
+
+/* ==========================================
+   Premium UI Animations (Stripe-level polish)
+   ========================================== */
+
+/* Skeleton shimmer animation */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Toast slide-in animation */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Scale in animation */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bounce animation for success states */
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Utility classes */
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+  background-size: 200% 100%;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Premium focus rings */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900;
+}
+
+/* Premium card hover effect */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10 hover:border-slate-600;
+}
+
+/* Glass morphism effect */
+.glass {
+  @apply bg-slate-800/50 backdrop-blur-xl border border-slate-700/50;
+}
+
+/* Premium gradient backgrounds */
+.gradient-primary {
+  @apply bg-gradient-to-br from-blue-600 to-indigo-700;
+}
+
+.gradient-success {
+  @apply bg-gradient-to-br from-green-500 to-emerald-600;
+}
+
+.gradient-surface {
+  @apply bg-gradient-to-br from-slate-800 to-slate-900;
+}

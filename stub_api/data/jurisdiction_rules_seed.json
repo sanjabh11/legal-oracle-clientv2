@@ -1,0 +1,229 @@
+{
+  "jurisdiction_rules": [
+    {
+      "jurisdiction": "ndca",
+      "court": "Northern District of California",
+      "rule_number": "Civ. L.R. 7-2",
+      "rule_title": "Page Limitations",
+      "rule_text": "Unless otherwise ordered, motions, oppositions, and replies shall not exceed 25, 25, and 15 pages respectively, exclusive of tables and exhibits.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ndca",
+      "court": "Northern District of California",
+      "rule_number": "Civ. L.R. 7-4",
+      "rule_title": "Meet and Confer Requirement",
+      "rule_text": "Before filing any discovery motion, the moving party must first make a good faith effort to meet and confer with the opposing party to resolve the dispute.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ndca",
+      "court": "Northern District of California",
+      "rule_number": "Civ. L.R. 7-5",
+      "rule_title": "Request for Hearing",
+      "rule_text": "Motions may be decided without oral argument. A party desiring oral argument must file a separate request stating why oral argument would be helpful.",
+      "rule_type": "motion_practice",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "sdny",
+      "court": "Southern District of New York",
+      "rule_number": "Local Civil Rule 6.1",
+      "rule_title": "Form of Papers",
+      "rule_text": "All papers shall be 8½ by 11 inches in size, with margins of at least one inch on all sides. Text shall be double-spaced, except for quotations and footnotes.",
+      "rule_type": "filing_requirements",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "sdny",
+      "court": "Southern District of New York",
+      "rule_number": "Local Civil Rule 37.2",
+      "rule_title": "Pre-Motion Conference for Discovery",
+      "rule_text": "Prior to making any motion relating to discovery, counsel must request a pre-motion conference with the Court by letter.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "sdny",
+      "court": "Southern District of New York",
+      "rule_number": "Local Civil Rule 7.1",
+      "rule_title": "Motion Papers",
+      "rule_text": "Memoranda of law in support of or in opposition to motions shall not exceed 25 pages without prior permission.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "cdca",
+      "court": "Central District of California",
+      "rule_number": "L.R. 7-3",
+      "rule_title": "Page Limits",
+      "rule_text": "Memoranda in support of and in opposition to a motion shall not exceed 35 pages. Reply memoranda shall not exceed 20 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "cdca",
+      "court": "Central District of California",
+      "rule_number": "L.R. 7-6",
+      "rule_title": "Joint Stipulation",
+      "rule_text": "Discovery motions shall be filed as Joint Stipulations containing each party's contentions and a proposed order.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "edtx",
+      "court": "Eastern District of Texas",
+      "rule_number": "Local Rule CV-7(a)",
+      "rule_title": "Motion Practice",
+      "rule_text": "Unless otherwise directed, the response to a motion shall be filed within 21 days. A reply may be filed within 14 days.",
+      "rule_type": "motion_practice",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "edtx",
+      "court": "Eastern District of Texas",
+      "rule_number": "Local Rule CV-26",
+      "rule_title": "Patent Local Rules",
+      "rule_text": "In patent cases, parties must comply with the Patent Rules which require disclosure of asserted claims and infringement contentions.",
+      "rule_type": "local_rules",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "del",
+      "court": "District of Delaware",
+      "rule_number": "D. Del. L.R. 7.1.3",
+      "rule_title": "Page Limitations",
+      "rule_text": "Opening and answering briefs shall not exceed 30 pages. Reply briefs shall not exceed 15 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "del",
+      "court": "District of Delaware",
+      "rule_number": "Default Standard for Discovery",
+      "rule_title": "Discovery Standards",
+      "rule_text": "Parties are expected to resolve discovery disputes informally. The Court will entertain discovery motions only after good faith efforts to resolve have failed.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ca_state",
+      "court": "California State Courts",
+      "rule_number": "CRC 3.1113",
+      "rule_title": "Memorandum Page Limits",
+      "rule_text": "A memorandum of points and authorities in support of or in opposition to a motion must not exceed 15 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ca_state",
+      "court": "California State Courts",
+      "rule_number": "CRC 3.1110",
+      "rule_title": "Format Requirements",
+      "rule_text": "Papers must be typewritten in at least 12-point type, double-spaced, with 1.5-inch left margin and 1-inch margins elsewhere.",
+      "rule_type": "filing_requirements",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ca_state",
+      "court": "California State Courts",
+      "rule_number": "CCP 2016.040",
+      "rule_title": "Meet and Confer Declaration",
+      "rule_text": "A motion relating to discovery must be accompanied by a declaration stating facts showing a reasonable and good faith attempt at informal resolution.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ny_state",
+      "court": "New York State Courts",
+      "rule_number": "CPLR 2214",
+      "rule_title": "Notice of Motion",
+      "rule_text": "A motion shall be noticed to be heard at a time not more than 60 days after the date of mailing of the notice of motion.",
+      "rule_type": "motion_practice",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ny_state",
+      "court": "New York State Courts",
+      "rule_number": "22 NYCRR 202.7",
+      "rule_title": "Discovery Disputes",
+      "rule_text": "Prior to making a discovery motion, counsel must confer in a good faith effort to resolve all disputes about disclosure.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ny_state",
+      "court": "New York State Courts",
+      "rule_number": "22 NYCRR 202.8-b",
+      "rule_title": "Page Limits",
+      "rule_text": "Absent court order, memoranda of law shall be limited to 25 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "tx_state",
+      "court": "Texas State Courts",
+      "rule_number": "TRCP 21",
+      "rule_title": "Filing Requirements",
+      "rule_text": "Every pleading, plea, motion, or application must be filed with the clerk by delivering it to the clerk or by electronic filing if available.",
+      "rule_type": "filing_requirements",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "tx_state",
+      "court": "Texas State Courts",
+      "rule_number": "TRCP 191.2",
+      "rule_title": "Discovery Conference",
+      "rule_text": "Parties must confer regarding discovery before seeking court intervention. The motion must state that counsel has conferred.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "fl_state",
+      "court": "Florida State Courts",
+      "rule_number": "Fla. R. Civ. P. 1.100",
+      "rule_title": "Pleading Requirements",
+      "rule_text": "All pleadings must be signed by an attorney and contain the attorney's Florida Bar number, address, telephone number, and email address.",
+      "rule_type": "filing_requirements",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "fl_state",
+      "court": "Florida State Courts",
+      "rule_number": "Fla. R. Civ. P. 1.380",
+      "rule_title": "Discovery Motions",
+      "rule_text": "Before filing any motion relating to discovery, the movant shall confer with counsel for the opposing party in a good faith effort to resolve the issues.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ndil",
+      "court": "Northern District of Illinois",
+      "rule_number": "LR 7.1",
+      "rule_title": "General Motion Practice",
+      "rule_text": "Motions shall be accompanied by a memorandum of law not exceeding 15 pages. Response memoranda shall not exceed 15 pages. Replies shall not exceed 5 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ndil",
+      "court": "Northern District of Illinois",
+      "rule_number": "LR 37.2",
+      "rule_title": "Discovery Disputes",
+      "rule_text": "Before filing any discovery motion, counsel shall confer in person or by telephone in a good faith effort to resolve the dispute.",
+      "rule_type": "discovery",
+      "effective_date": "2023-01-01"
+    },
+    {
+      "jurisdiction": "ma",
+      "court": "District of Massachusetts",
+      "rule_number": "Local Rule 7.1",
+      "rule_title": "Motion Practice",
+      "rule_text": "Memoranda in support of and in opposition to dispositive motions shall not exceed 20 pages. Non-dispositive motions shall not exceed 10 pages.",
+      "rule_type": "page_limits",
+      "effective_date": "2023-01-01"
+    }
+  ]
+}

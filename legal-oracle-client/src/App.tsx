@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom'
-import { Scale, Brain, Users, Calculator, FileText, TrendingUp, Search, Gavel, Shield, BarChart3, Target, Handshake, Zap } from 'lucide-react'
+import { Scale, Brain, Users, Calculator, FileText, TrendingUp, Search, Gavel, Shield, BarChart3, Target, Handshake, Zap, DollarSign, GitBranch } from 'lucide-react'
 import { LegalDatabaseService, HuggingFaceAPI, GameTheoryEngine, getAuthHeaders } from './lib/supabase'
 
 // Import components
@@ -16,7 +16,10 @@ import {
   StrategicIntelligence,
   CoalitionAnalysis,
   AuthPage,
-  ProtectedRoute
+  ProtectedRoute,
+  PricingPage,
+  SettlementCalculator,
+  WhopCallback
 } from './components'
 import DocumentAnalysis from './components/DocumentAnalysis'
 
@@ -51,6 +54,9 @@ function App() {
           <Route path="/multi-player" element={<ProtectedRoute><MultiPlayerScenarios /></ProtectedRoute>} />
           <Route path="/strategic-intelligence" element={<ProtectedRoute><StrategicIntelligence /></ProtectedRoute>} />
           <Route path="/coalition-analysis" element={<ProtectedRoute><CoalitionAnalysis /></ProtectedRoute>} />
+          <Route path="/settlement-calculator" element={<ProtectedRoute><SettlementCalculator /></ProtectedRoute>} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/auth/whop/callback" element={<WhopCallback />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

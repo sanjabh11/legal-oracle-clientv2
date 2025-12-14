@@ -2177,6 +2177,559 @@ async def get_workflow_report(
     return workflow_data
 
 # -------------------------
+# Monetization v2.1 - Pricing & CourtListener Endpoints
+# -------------------------
+
+# Import pricing and CourtListener services
+try:
+    from pricing_service import (
+        PricingTier, get_tier_config, has_feature, require_feature,
+        check_usage_limit, increment_usage, get_user_usage_summary,
+        verify_whop_signature, process_whop_webhook, get_upgrade_recommendation
+    )
+    PRICING_AVAILABLE = True
+except ImportError:
+    PRICING_AVAILABLE = False
+    print("Warning: pricing_service not available")
+
+try:
+    from courtlistener_api import (
+        search_opinions, get_opinion, search_dockets, get_recent_filings,
+        get_rate_limit_status, fetch_opinions_for_etl
+    )
+    COURTLISTENER_AVAILABLE = True
+except ImportError:
+    COURTLISTENER_AVAILABLE = False
+    print("Warning: courtlistener_api not available")
+
+class PricingCheckRequest(BaseModel):
+    user_id: str
+    tier: str
+    feature: str
+
+class WhopWebhookPayload(BaseModel):
+    event: str
+    data: Dict[str, Any]
+    timestamp: str
+    signature: Optional[str] = None
+
+class CourtListenerSearchRequest(BaseModel):
+    query: str
+    court: Optional[str] = None
+    days_back: Optional[int] = 30
+    page: Optional[int] = 1
+    page_size: Optional[int] = 20
+
+@app.get("/api/v1/pricing/tiers")
+async def get_pricing_tiers():
+    """Get all pricing tier configurations"""
+    if not PRICING_AVAILABLE:
+        return {"error": "Pricing service not available", "tiers": []}
+    
+    tiers = []
+    for tier in PricingTier:
+        config = get_tier_config(tier)
+        tiers.append({
+            "id": tier.value,
+            "name": config.name,
+            "price": config.price,
+            "features": {
+                "courtlistener_search": config.features.courtlistener_search,
+                "search_results_limit": config.features.search_results_limit,
+                "ai_motion_drafting": config.features.ai_motion_drafting,
+                "glass_box_citations": config.features.glass_box_citations,
+                "judge_analytics_lite": config.features.judge_analytics_lite,
+                "judge_analytics_full": config.features.judge_analytics_full,
+                "docket_monitoring": config.features.docket_monitoring,
+                "daily_alerts": config.features.daily_alerts,
+                "pacer_fetches_per_month": config.features.pacer_fetches_per_month,
+                "user_seats": config.features.user_seats,
+                "api_access": config.features.api_access,
+                "community_access": config.features.community_access,
+            }
+        })
+    return {"tiers": tiers}
+
+@app.post("/api/v1/pricing/check-feature")
+async def check_feature_access(
+    request: PricingCheckRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """Check if user's tier has access to a feature"""
+    require_auth(Authorization)
+    
+    if not PRICING_AVAILABLE:
+        return {"allowed": True, "reason": "Pricing service not available - defaulting to allowed"}
+    
+    try:
+        tier = PricingTier(request.tier)
+    except ValueError:
+        tier = PricingTier.GUEST
+    
+    allowed = has_feature(tier, request.feature)
+    usage = check_usage_limit(request.user_id, tier, request.feature)
+    
+    return {
+        "allowed": allowed and usage["allowed"],
+        "tier": tier.value,
+        "feature": request.feature,
+        "usage": usage,
+        "upgrade_recommendation": get_upgrade_recommendation(tier) if not allowed else None
+    }
+
+@app.get("/api/v1/pricing/usage/{user_id}")
+async def get_usage_summary(
+    user_id: str,
+    tier: str = "guest",
+    Authorization: Optional[str] = Header(None)
+):
+    """Get usage summary for a user"""
+    require_auth(Authorization)
+    
+    if not PRICING_AVAILABLE:
+        return {"error": "Pricing service not available"}
+    
+    try:
+        pricing_tier = PricingTier(tier)
+    except ValueError:
+        pricing_tier = PricingTier.GUEST
+    
+    return get_user_usage_summary(user_id, pricing_tier)
+
+@app.post("/api/v1/webhooks/whop")
+async def handle_whop_webhook(
+    payload: WhopWebhookPayload,
+    request: Request
+):
+    """
+    Handle Whop webhook events for subscription management
+    Events: membership.went_valid, membership.went_invalid, membership.canceled, payment.failed
+    """
+    if not PRICING_AVAILABLE:
+        return {"status": "ignored", "reason": "Pricing service not available"}
+    
+    # Verify webhook signature
+    body = await request.body()
+    if payload.signature and not verify_whop_signature(body, payload.signature):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    
+    # Process the webhook
+    result = process_whop_webhook(payload.event, payload.data)
+    
+    # Handle specific actions
+    if result["action"] == "grant_access":
+        # TODO: Update user subscription in database
+        print(f"Granting access to user {result['user_id']} for tier {result['tier']}")
+    elif result["action"] == "revoke_access":
+        # TODO: Revoke user access in database
+        print(f"Revoking access for user {result['user_id']}")
+    elif result["action"] == "payment_failed":
+        # TODO: Send payment failure notification
+        print(f"Payment failed for user {result['user_id']}")
+    
+    return {"status": "processed", "result": result}
+
+@app.post("/api/v1/courtlistener/search")
+async def courtlistener_search(
+    request: CourtListenerSearchRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Search CourtListener opinions
+    Requires: Starter tier or above
+    """
+    require_auth(Authorization)
+    
+    if not COURTLISTENER_AVAILABLE:
+        return {"error": "CourtListener API not available", "opinions": []}
+    
+    try:
+        result = await search_opinions(
+            query=request.query,
+            court=request.court,
+            filed_after_relative=request.days_back,
+            page=request.page,
+            page_size=request.page_size
+        )
+        
+        return {
+            "opinions": [
+                {
+                    "id": o.id,
+                    "case_name": o.case_name,
+                    "court": o.court,
+                    "date_filed": o.date_filed,
+                    "citation_count": o.citation_count,
+                    "excerpt": o.text_excerpt,
+                    "url": o.absolute_url
+                }
+                for o in result.opinions
+            ],
+            "total": result.count,
+            "has_more": result.next_page is not None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CourtListener search failed: {str(e)}")
+
+@app.get("/api/v1/courtlistener/recent")
+async def get_recent_court_filings(
+    days: int = 7,
+    court: Optional[str] = None,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Get recent court filings using relative date filtering
+    This is a key differentiator per monetization research
+    """
+    require_auth(Authorization)
+    
+    if not COURTLISTENER_AVAILABLE:
+        return {"error": "CourtListener API not available", "dockets": []}
+    
+    try:
+        dockets = await get_recent_filings(days=days, court=court)
+        return {
+            "dockets": [
+                {
+                    "id": d.id,
+                    "case_name": d.case_name,
+                    "court": d.court,
+                    "date_filed": d.date_filed,
+                    "docket_number": d.docket_number,
+                    "nature_of_suit": d.nature_of_suit,
+                    "assigned_to": d.assigned_to_str,
+                    "url": d.absolute_url
+                }
+                for d in dockets
+            ],
+            "days_covered": days,
+            "court_filter": court
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recent filings: {str(e)}")
+
+@app.get("/api/v1/courtlistener/status")
+async def get_courtlistener_status(Authorization: Optional[str] = Header(None)):
+    """Get CourtListener API rate limit status"""
+    require_auth(Authorization)
+    
+    if not COURTLISTENER_AVAILABLE:
+        return {"available": False, "reason": "CourtListener API not configured"}
+    
+    return {
+        "available": True,
+        **get_rate_limit_status()
+    }
+
+@app.post("/api/v1/courtlistener/ingest")
+async def trigger_courtlistener_etl(
+    jurisdiction: str = "ca",
+    case_type: str = "civil",
+    days_back: int = 30,
+    Authorization: Optional[str] = Header(None)
+):
+    """
+    Trigger ETL pipeline to ingest cases from CourtListener
+    Admin endpoint for data ingestion
+    """
+    require_auth(Authorization)
+    
+    if not COURTLISTENER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="CourtListener API not available")
+    
+    try:
+        opinions = await fetch_opinions_for_etl(
+            jurisdiction=jurisdiction,
+            case_type=case_type,
+            days_back=days_back
+        )
+        
+        # Insert into database
+        inserted = 0
+        for opinion in opinions:
+            try:
+                supabase.table("legal_cases").upsert(opinion).execute()
+                inserted += 1
+            except Exception as e:
+                print(f"Failed to insert case {opinion['case_id']}: {e}")
+        
+        return {
+            "status": "completed",
+            "fetched": len(opinions),
+            "inserted": inserted,
+            "jurisdiction": jurisdiction,
+            "case_type": case_type,
+            "days_back": days_back
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ETL pipeline failed: {str(e)}")
+
+# -------------------------
+# Jurisdiction RAG & Docket Alerts Endpoints
+# -------------------------
+
+try:
+    from jurisdiction_rag import (
+        get_jurisdiction_profile, get_local_rules, get_filing_requirements,
+        check_document_compliance, generate_jurisdiction_prompt_context,
+        get_motion_checklist, search_local_rules, get_all_jurisdictions
+    )
+    JURISDICTION_RAG_AVAILABLE = True
+except ImportError:
+    JURISDICTION_RAG_AVAILABLE = False
+    print("Warning: jurisdiction_rag not available")
+
+try:
+    from docket_alerts import (
+        create_subscription, get_user_subscriptions, get_subscription,
+        update_subscription, delete_subscription, create_alert,
+        get_user_alerts, mark_alert_read, mark_all_read,
+        process_new_filing, subscription_to_dict, alert_to_dict
+    )
+    DOCKET_ALERTS_AVAILABLE = True
+except ImportError:
+    DOCKET_ALERTS_AVAILABLE = False
+    print("Warning: docket_alerts not available")
+
+class JurisdictionRequest(BaseModel):
+    jurisdiction: str
+
+class DocumentComplianceRequest(BaseModel):
+    jurisdiction: str
+    document_type: str
+    page_count: int
+    has_table_of_contents: bool = False
+    has_table_of_authorities: bool = False
+
+class DocketSubscriptionRequest(BaseModel):
+    case_id: str
+    case_name: str
+    court: str
+    jurisdiction: str
+    docket_number: str
+    alert_types: List[str]
+    delivery_methods: List[str]
+    webhook_url: Optional[str] = None
+    game_theory_params: Optional[Dict[str, Any]] = None
+
+class NewFilingRequest(BaseModel):
+    case_id: str
+    filing_type: str
+    filing_details: Dict[str, Any]
+
+@app.get("/api/v1/jurisdictions")
+async def list_jurisdictions():
+    """Get list of all supported jurisdictions"""
+    if not JURISDICTION_RAG_AVAILABLE:
+        return {"jurisdictions": [], "error": "Jurisdiction RAG not available"}
+    return {"jurisdictions": get_all_jurisdictions()}
+
+@app.get("/api/v1/jurisdiction/{jurisdiction_id}")
+async def get_jurisdiction(jurisdiction_id: str, Authorization: Optional[str] = Header(None)):
+    """Get jurisdiction profile and requirements"""
+    require_auth(Authorization)
+    
+    if not JURISDICTION_RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Jurisdiction RAG not available")
+    
+    profile = get_jurisdiction_profile(jurisdiction_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Jurisdiction not found: {jurisdiction_id}")
+    
+    return {
+        "jurisdiction": {
+            "id": profile.jurisdiction_id,
+            "name": profile.name,
+            "court_type": profile.court_type,
+            "parent": profile.parent_jurisdiction,
+            "filing_system": profile.filing_system,
+            "local_rules_url": profile.local_rules_url,
+            "special_requirements": profile.special_requirements
+        },
+        "filing_requirements": get_filing_requirements(jurisdiction_id),
+        "rag_context": generate_jurisdiction_prompt_context(jurisdiction_id)
+    }
+
+@app.post("/api/v1/jurisdiction/compliance-check")
+async def check_compliance(
+    request: DocumentComplianceRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """Check document compliance with jurisdiction rules"""
+    require_auth(Authorization)
+    
+    if not JURISDICTION_RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Jurisdiction RAG not available")
+    
+    return check_document_compliance(
+        jurisdiction=request.jurisdiction,
+        document_type=request.document_type,
+        page_count=request.page_count,
+        has_table_of_contents=request.has_table_of_contents,
+        has_table_of_authorities=request.has_table_of_authorities
+    )
+
+@app.get("/api/v1/jurisdiction/{jurisdiction_id}/checklist/{motion_type}")
+async def get_checklist(
+    jurisdiction_id: str,
+    motion_type: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """Get motion filing checklist for jurisdiction"""
+    require_auth(Authorization)
+    
+    if not JURISDICTION_RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Jurisdiction RAG not available")
+    
+    return get_motion_checklist(jurisdiction_id, motion_type)
+
+@app.get("/api/v1/jurisdiction/{jurisdiction_id}/rules")
+async def get_rules(
+    jurisdiction_id: str,
+    rule_type: Optional[str] = None,
+    Authorization: Optional[str] = Header(None)
+):
+    """Get local rules for jurisdiction"""
+    require_auth(Authorization)
+    
+    if not JURISDICTION_RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Jurisdiction RAG not available")
+    
+    from jurisdiction_rag import RuleType
+    rt = RuleType(rule_type) if rule_type else None
+    rules = get_local_rules(jurisdiction_id, rt)
+    
+    return {
+        "jurisdiction": jurisdiction_id,
+        "rule_type": rule_type,
+        "rules": [
+            {
+                "id": r.id,
+                "rule_number": r.rule_number,
+                "rule_title": r.rule_title,
+                "rule_text": r.rule_text,
+                "rule_type": r.rule_type.value
+            }
+            for r in rules
+        ]
+    }
+
+# Docket Alerts Endpoints
+@app.post("/api/v1/docket-alerts/subscribe")
+async def create_docket_subscription(
+    request: DocketSubscriptionRequest,
+    Authorization: Optional[str] = Header(None)
+):
+    """Create a new docket monitoring subscription"""
+    token = require_auth(Authorization)
+    
+    if not DOCKET_ALERTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Docket Alerts not available")
+    
+    # Extract user_id from token (simplified)
+    user_id = f"user_{hash(token) % 10000}"
+    
+    subscription = create_subscription(
+        user_id=user_id,
+        case_id=request.case_id,
+        case_name=request.case_name,
+        court=request.court,
+        jurisdiction=request.jurisdiction,
+        docket_number=request.docket_number,
+        alert_types=request.alert_types,
+        delivery_methods=request.delivery_methods,
+        webhook_url=request.webhook_url,
+        game_theory_params=request.game_theory_params
+    )
+    
+    return {"subscription": subscription_to_dict(subscription)}
+
+@app.get("/api/v1/docket-alerts/subscriptions")
+async def list_subscriptions(Authorization: Optional[str] = Header(None)):
+    """Get user's docket subscriptions"""
+    token = require_auth(Authorization)
+    
+    if not DOCKET_ALERTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Docket Alerts not available")
+    
+    user_id = f"user_{hash(token) % 10000}"
+    subscriptions = get_user_subscriptions(user_id)
+    
+    return {"subscriptions": [subscription_to_dict(s) for s in subscriptions]}
+
+@app.delete("/api/v1/docket-alerts/subscriptions/{subscription_id}")
+async def remove_subscription(
+    subscription_id: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """Delete a docket subscription"""
+    require_auth(Authorization)
+    
+    if not DOCKET_ALERTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Docket Alerts not available")
+    
+    success = delete_subscription(subscription_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    return {"deleted": True}
+
+@app.get("/api/v1/docket-alerts/alerts")
+async def list_alerts(
+    unread_only: bool = False,
+    limit: int = 50,
+    Authorization: Optional[str] = Header(None)
+):
+    """Get user's docket alerts"""
+    token = require_auth(Authorization)
+    
+    if not DOCKET_ALERTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Docket Alerts not available")
+    
+    user_id = f"user_{hash(token) % 10000}"
+    alerts = get_user_alerts(user_id, unread_only, limit)
+    
+    return {"alerts": [alert_to_dict(a) for a in alerts]}
+
+@app.post("/api/v1/docket-alerts/alerts/{alert_id}/read")
+async def mark_read(
+    alert_id: str,
+    Authorization: Optional[str] = Header(None)
+):
+    """Mark an alert as read"""
+    require_auth(Authorization)
+    
+    if not DOCKET_ALERTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Docket Alerts not available")
+    
+    success = mark_alert_read(alert_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    return {"marked_read": True}
+
+@app.post("/api/v1/docket-alerts/webhook/filing")
+async def handle_filing_webhook(request: NewFilingRequest):
+    """
+    Webhook endpoint for new filing notifications.
+    Triggers Nash recalculation for relevant subscriptions.
+    """
+    if not DOCKET_ALERTS_AVAILABLE:
+        return {"status": "ignored", "reason": "Docket Alerts not available"}
+    
+    alerts = await process_new_filing(
+        case_id=request.case_id,
+        filing_type=request.filing_type,
+        filing_details=request.filing_details
+    )
+    
+    return {
+        "status": "processed",
+        "alerts_created": len(alerts),
+        "alerts": [alert_to_dict(a) for a in alerts]
+    }
+
+# -------------------------
 # Run server
 # -------------------------
 if __name__ == "__main__":

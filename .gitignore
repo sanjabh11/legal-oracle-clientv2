@@ -163,6 +163,12 @@ fixtures/
 docs/_build/
 docs/.doctrees/
 
+# ==================== Documentation (Temporary) ====================
+# Keep docs/ folder but exclude temporary analysis files from main branch
+# Uncomment if you want to exclude docs from deployment
+# docs/IMPLEMENTATION_*.md
+# docs/*_GAP_ANALYSIS*.md
+
 # ==================== Optional: Uncomment if needed ====================
 # macOS
 # .AppleDouble
